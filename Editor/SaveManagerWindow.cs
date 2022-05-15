@@ -9,13 +9,13 @@ namespace HeartfieldEditor.SerializableData
 {
     class SaveManagerWindow : EditorWindow
     {
-        bool useCustomDirectory;
+        bool useCustomDirectory = false;
         Environment.SpecialFolder specialFolders;
-        bool includeCompanyName;
-        bool includeProductName;
-        string path;
+        bool includeCompanyName = false;
+        bool includeProductName = false;
+        string path = "";
         string extension = "sav";
-        string finalPath;
+        string finalPath = "";
 
         [MenuItem("Heartfield Productions/Serialization/Save Manager")]
         static void Create()
@@ -35,20 +35,22 @@ namespace HeartfieldEditor.SerializableData
             includeProductName = EditorGUILayout.Toggle("Include Product Name", includeProductName);
             path = EditorGUILayout.TextField("Path", path);
 
-            finalPath = Environment.GetFolderPath(specialFolders);
-
-            if (includeCompanyName)
-                finalPath = Path.Combine(finalPath, Application.companyName);
-
-            if (includeProductName)
-                finalPath = Path.Combine(finalPath, Application.productName);
-
-            finalPath = Path.Combine(finalPath, path);
-
             EditorGUILayout.EndToggleGroup();
 
             if (!useCustomDirectory)
                 finalPath = Application.persistentDataPath;
+            else
+            {
+                finalPath = Environment.GetFolderPath(specialFolders);
+
+                if (includeCompanyName)
+                    finalPath = Path.Combine(finalPath, Application.companyName);
+
+                if (includeProductName)
+                    finalPath = Path.Combine(finalPath, Application.productName);
+
+                finalPath = Path.Combine(finalPath, path);
+            }
 
             Settings.path = finalPath;
 
