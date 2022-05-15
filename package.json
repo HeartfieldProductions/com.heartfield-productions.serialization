@@ -1,0 +1,14 @@
+{
+  "name": "com.heartfield-productions.serialization",
+  "version": "1.0.0",
+  "displayName": "Save/Load Game System",
+  "description": "Save/Load game in external .sav file in slots",
+  "author": {
+    "name": "Heartfield Productions"
+  },
+  "type": "Serialization",
+  "unity": "2018.1",
+  "dependencies": {
+    "com.heartfield-productions.core": "1.0.0"
+  }
+}
