@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using System.Collections.Generic;
 
-namespace Heartfield.SerializableData
+namespace Heartfield.Serialization
 {
     [Serializable]
     sealed class Data
@@ -51,7 +51,7 @@ namespace Heartfield.SerializableData
             return hash;
         }
 
-        public static void OnSave(string name, int slot, out bool isNewSave)
+        public static void Save(string name, int slot, out bool isNewSave)
         {
             _currentSaveableId = 0;
 
@@ -62,16 +62,16 @@ namespace Heartfield.SerializableData
                 _saveableObjects[i].PopulateSaveData();
             }
 
-            SerializationSystem.Save(_data, name, slot, out isNewSave);
+            SerializationSystem.Serialize(_data, name, slot, out isNewSave);
 
             _data.ClearData();
         }
 
-        public static void OnLoad(int slot)
+        public static void Load(int slot)
         {
             _currentSaveableId = 0;
 
-            _data = SerializationSystem.Load(slot);
+            _data = SerializationSystem.Deserialize(slot);
 
             for (int i = 0; i < _saveableObjects.Count; i++)
             {
@@ -88,8 +88,7 @@ namespace Heartfield.SerializableData
 
         public static void OnDelete(int slot) => SerializationSystem.DeleteSaveFile(slot);
 
-        public static int SaveFilesAmount => SerializationSystem.SaveFilesAmount();
-        public static bool HasSaves => SaveFilesAmount > 0;
+        public static int SaveFilesAmount() => SerializationSystem.SaveFilesAmount();
         public static int LastSaveDataSlot => SerializationSystem.GetLastSaveFileSlot();
     }
 }

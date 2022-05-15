@@ -1,6 +1,6 @@
 using System;
 
-namespace Heartfield.SerializableData
+namespace Heartfield.Serialization
 {
     [Serializable]
     public class SaveData

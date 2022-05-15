@@ -1,4 +1,4 @@
-namespace Heartfield.SerializableData
+namespace Heartfield.Serialization
 {
     public interface ISaveable
     {

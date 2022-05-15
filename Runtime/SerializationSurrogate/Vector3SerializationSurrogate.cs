@@ -1,7 +1,7 @@
 using UnityEngine;
 using System.Runtime.Serialization;
 
-namespace Heartfield.SerializableData
+namespace Heartfield.Serialization
 {
     class Vector3SerializationSurrogate : ISerializationSurrogate
     {
