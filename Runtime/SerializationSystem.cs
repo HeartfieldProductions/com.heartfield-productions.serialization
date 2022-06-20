@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 
-
 namespace Heartfield.Serialization
 {
     internal static class SerializationSystem
@@ -21,11 +20,23 @@ namespace Heartfield.Serialization
 
         static void CreateDirectory()
         {
-            if (!Directory.Exists(Settings.path))
-                Directory.CreateDirectory(Settings.path);
+            if (!Directory.Exists(SaveSettings.path))
+                Directory.CreateDirectory(SaveSettings.path);
         }
 
-        static FileInfo GetFileInfo(int slot) => _dirInfo.GetFiles().Where(a => a.Name.EndsWith(string.Format("{0:00}.{1}", slot, Settings.fileExtension), StringComparison.OrdinalIgnoreCase)).ToArray()[0];
+        /// <summary>
+        /// ..."slot"."SaveSettings.fileExtension"
+        /// </summary>
+        /// <param name="slot"></param>
+        /// <returns></returns>
+        static string GetFileSlotAndExtension(int slot) => $"{slot:0:00}.{SaveSettings.fileExtension}";
+
+        static FileInfo GetFileInfo(int slot) => _dirInfo.GetFiles().Where(a => a.Name.EndsWith(GetFileSlotAndExtension(slot), StringComparison.OrdinalIgnoreCase)).ToArray()[0];
+
+        static void PopulateFilesInfo(int slot)
+        {
+            _filesInfo.Add(slot, GetFileInfo(slot));
+        }
 
         static SerializationSystem()
         {
@@ -33,14 +44,14 @@ namespace Heartfield.Serialization
 
             CreateDirectory();
 
-            _dirInfo = new DirectoryInfo(Settings.path);
+            _dirInfo = new DirectoryInfo(SaveSettings.path);
 
             if (_dirInfo.GetFiles().Length > 0)
             {
                 int lastSaveSlot = PlayerPrefs.GetInt(_lastSaveSlotKey);
 
                 for (int i = 1; i < lastSaveSlot; i++)
-                    _filesInfo.Add(i, GetFileInfo(i));
+                    PopulateFilesInfo(i);
             }
         }
 
@@ -52,38 +63,43 @@ namespace Heartfield.Serialization
 
         static SurrogateSelector SetupSurrogates()
         {
-            SurrogateSelector selector = new SurrogateSelector();
+            var selector = new SurrogateSelector();
+            var streamingCtx = new StreamingContext(StreamingContextStates.All);
 
-            Vector3SerializationSurrogate v3 = new Vector3SerializationSurrogate();
-            selector.AddSurrogate(typeof(Vector3), new StreamingContext(StreamingContextStates.All), v3);
+            var v2 = new Vector2SerializationSurrogate(out var v2Type);
+            selector.AddSurrogate(v2Type, streamingCtx, v2);
 
-            QuaternionSerializationSurrogate qt = new QuaternionSerializationSurrogate();
-            selector.AddSurrogate(typeof(Quaternion), new StreamingContext(StreamingContextStates.All), qt);
+            var v3 = new Vector3SerializationSurrogate(out var v3Type);
+            selector.AddSurrogate(v3Type, streamingCtx, v3);
 
-            TransformSerializationSurrogate tr = new TransformSerializationSurrogate();
-            selector.AddSurrogate(typeof(Transform), new StreamingContext(StreamingContextStates.All), tr);
+            var v4 = new Vector4SerializationSurrogate(out var v4Type);
+            selector.AddSurrogate(v4Type, streamingCtx, v4);
+
+            var qt = new QuaternionSerializationSurrogate(out var qtType);
+            selector.AddSurrogate(qtType, streamingCtx, qt);
+
+            var tr = new TransformSerializationSurrogate(out var trType);
+            selector.AddSurrogate(trType, streamingCtx, tr);
 
             return selector;
         }
 
         static BinaryFormatter GetBinaryFormatter()
         {
-            if (_binaryFormatter != null)
-                return _binaryFormatter;
-            else
+            if (_binaryFormatter == null)
             {
                 _binaryFormatter = new BinaryFormatter
                 {
                     SurrogateSelector = SetupSurrogates()
                 };
-
-                return _binaryFormatter;
             }
+
+            return _binaryFormatter;
         }
 
         //static string CreateSaveFilePath(string name, int slot) => Path.Combine(Settings.path, string.Format("{0}{1:00}.{2}", name, slot, Settings.fileExtension));
 
-        internal static bool Serialize(Data data, string saveName, int slot, out bool isNewSave)
+        internal static bool Serialize(SaveData data, string saveName, int slot, out bool isNewSave)
         {
             var formatter = GetBinaryFormatter();
 
@@ -91,7 +107,7 @@ namespace Heartfield.Serialization
 
             _filesInfo.Clear();
 
-            string path = Settings.GetSaveFilePath(saveName, slot);
+            string path = SaveSettings.GetFullFilePath(saveName, slot);
 
             isNewSave = !File.Exists(path);
 
@@ -99,14 +115,14 @@ namespace Heartfield.Serialization
             formatter.Serialize(file, data);
             file.Close();
 
-            _dirInfo = new DirectoryInfo(Settings.path);
+            //_dirInfo = new DirectoryInfo(SaveSettings.path);
 
-            _filesInfo.Add(slot, GetFileInfo(slot));
+            PopulateFilesInfo(slot);
 
             PlayerPrefs.SetInt(_lastSaveSlotKey, slot);
             PlayerPrefs.Save();
 
-            Debug.Log(string.Format("Game saved succesfully at: {0}", path));
+            Debug.Log($"Game saved succesfully at: {path}");
 
             return true;
         }
@@ -118,10 +134,10 @@ namespace Heartfield.Serialization
         static string GetSaveFilePath(int slot)
         {
             CreateDirectory();
-            return Directory.GetFiles(Settings.path).Where(a => a.EndsWith(string.Format("{0:00}.{1}", slot, Settings.fileExtension))).ToArray()[0];
+            return Directory.GetFiles(SaveSettings.path).Where(a => a.EndsWith(GetFileSlotAndExtension(slot))).ToArray()[0];
         }
 
-        internal static Data Deserialize(int slot)
+        internal static SaveData Deserialize(int slot)
         {
             string path = GetSaveFilePath(slot);
 
@@ -139,7 +155,7 @@ namespace Heartfield.Serialization
                 var save = formatter.Deserialize(file);
                 //Debug.Log(string.Format("Game loaded succesfully at: {0}", path));
                 file.Close();
-                return save as Data;
+                return save as SaveData;
             }
             catch
             {
@@ -162,10 +178,10 @@ namespace Heartfield.Serialization
 
         internal static int SaveFilesAmount()
         {
-            if (!Directory.Exists(Settings.path))
+            if (!Directory.Exists(SaveSettings.path))
                 return 0;
 
-            return Directory.GetFiles(Settings.path).Length;
+            return Directory.GetFiles(SaveSettings.path).Length;
         }
     }
 }

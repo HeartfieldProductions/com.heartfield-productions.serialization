@@ -1,15 +1,21 @@
+using System;
 using UnityEngine;
 using System.Runtime.Serialization;
 
 namespace Heartfield.Serialization
 {
-    class QuaternionSerializationSurrogate : ISerializationSurrogate
+    sealed class QuaternionSerializationSurrogate : ISerializationSurrogate
     {
         readonly string[] a = new string[] { "x", "y", "z", "w" };
 
+        internal QuaternionSerializationSurrogate(out Type type)
+        {
+            type = typeof(Quaternion);
+        }
+
         public void GetObjectData(object obj, SerializationInfo info, StreamingContext context)
         {
-            Quaternion qt = (Quaternion)obj;
+            var qt = (Quaternion)obj;
 
             info.AddValue(a[0], qt.x);
             info.AddValue(a[1], qt.y);
@@ -19,7 +25,7 @@ namespace Heartfield.Serialization
 
         public object SetObjectData(object obj, SerializationInfo info, StreamingContext context, ISurrogateSelector selector)
         {
-            Quaternion qt = (Quaternion)obj;
+            var qt = (Quaternion)obj;
 
             qt.x = (float)info.GetValue(a[0], typeof(float));
             qt.y = (float)info.GetValue(a[1], typeof(float));

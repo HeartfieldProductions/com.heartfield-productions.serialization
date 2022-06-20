@@ -1,20 +1,16 @@
 using System;
+using UnityEngine;
+using System.Collections.Generic;
 
 namespace Heartfield.Serialization
 {
     [Serializable]
-    public class SaveData
+    sealed class SaveData
     {
-        object _data;
-        Type _type;
+        Dictionary<Hash128, object> _data = new Dictionary<Hash128, object>();
 
-        internal object data => _data;
-        internal Type type => _type;
-
-        //internal SaveData(ISaveable data)
-        //{
-        //    _data = data.PopulateSaveData();
-        //    _type = data.GetType();
-        //}
+        internal void Clear() => _data.Clear();
+        internal void Add<T>(Hash128 hash, T data) => _data.Add(hash, data);
+        internal T Get<T>(Hash128 hash) => (T)_data[hash];
     }
 }
