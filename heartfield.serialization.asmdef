@@ -1,6 +1,6 @@
 {
     "name": "heartfield.serialization",
-    "rootNamespace": "Heartfield.SerializableData",
+    "rootNamespace": "Heartfield.Serialization",
     "references": [
         "GUID:8c7130d203f708046af84729880abff5"
     ],
