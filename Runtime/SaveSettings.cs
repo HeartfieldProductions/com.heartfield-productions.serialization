@@ -2,7 +2,7 @@ using System.IO;
 
 namespace Heartfield.Serialization
 {
-    static class SaveSettings
+    internal static class SaveSettings
     {
         internal static string path = "Saves";
         internal static string fileExtension = "sav";

@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEditor;
 using System.Diagnostics;
 using Heartfield.Serialization;
+using Debug = UnityEngine.Debug;
 
 namespace HeartfieldEditor.Serialization
 {
@@ -27,11 +28,14 @@ namespace HeartfieldEditor.Serialization
         UserProfile = 40
     }
 
-    sealed class SaveManagerWindow : HeartfieldEditorWindow<SaveManagerWindowAsset>
+    sealed class SaveManagerWindow : EditorWindow<SaveManagerWindowAsset>
     {
         static SaveManagerWindowAsset asset;
+        static Type saveSettings;
 
-        protected override SaveManagerWindowAsset AssetToSave
+        readonly object[] testSaveArgs = new object[] { "TestSave", 1 };
+
+        protected override SaveManagerWindowAsset GetAsset
         {
             get
             {
@@ -103,7 +107,7 @@ namespace HeartfieldEditor.Serialization
                 asset.finalPath = GetDirectory(asset.rootDirectory);
             }
 
-            SaveSettings.fileExtension = asset.extension;
+            saveSettings.SetFieldValue("fileExtension", asset.extension);
 
             if (TargetPlatformIsLinux)
                 asset.validFolder = asset.specialFolders != SpecialFolders.Favorites && asset.specialFolders != SpecialFolders.InternetCache && asset.specialFolders != SpecialFolders.ProgramFiles;
@@ -112,12 +116,12 @@ namespace HeartfieldEditor.Serialization
 
             if (asset.validFolder)
             {
-                SaveSettings.path = asset.finalPath;
+                saveSettings.SetFieldValue("path", asset.extension);
 
                 if (useGameDataPath)
-                    asset.previewPath = $"{GetDirectory("path to executablename_Data folder")}/{SaveSettings.GetFilePath("TestSave", 1)}";
+                    asset.previewPath = $"{GetDirectory("path to executablename_Data folder")}/{saveSettings.GetMethodValue<string>("GetFilePath", testSaveArgs)}";
                 else
-                    asset.previewPath = SaveSettings.GetFullFilePath("TestSave", 1);
+                    asset.previewPath = saveSettings.GetMethodValue<string>("GetFullFilePath", testSaveArgs);
             }
             else
                 asset.previewPath = "Invalid path. Please choose another Special Folder";
@@ -126,6 +130,12 @@ namespace HeartfieldEditor.Serialization
         protected override void OnEnable()
         {
             base.OnEnable();
+
+            if (saveSettings == null)
+            {
+                saveSettings = EditorUtilities.GetClassType("heartfield.serialization", "Heartfield.Serialization.SaveSettings");
+            }
+
             CheckSavePath();
         }
 
@@ -195,14 +205,16 @@ namespace HeartfieldEditor.Serialization
             EditorGUI.BeginDisabledGroup(Application.isPlaying);
             if (GUILayout.Button("Create Test Save Data", EditorStyles.miniButtonRight))
             {
-                SaveManager.Save("TestSave", 1, out _);
+                SaveManager.Save((string)testSaveArgs[0], (int)testSaveArgs[1], out _);
             }
             EditorGUI.EndDisabledGroup();
 
             if (GUILayout.Button("Open Directory", EditorStyles.miniButtonRight))
             {
-                if (Directory.Exists(SaveSettings.path))
-                    Process.Start(SaveSettings.path);
+                string path = saveSettings.GetFieldValue<string>("path");
+
+                if (Directory.Exists(path))
+                    Process.Start(path);
                 else
                     Process.Start(asset.rootDirectory);
             }

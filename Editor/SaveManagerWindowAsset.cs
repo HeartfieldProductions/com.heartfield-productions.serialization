@@ -4,7 +4,7 @@ using System;
 namespace HeartfieldEditor.Serialization
 {
     [Serializable]
-    sealed class SaveManagerWindowAsset
+    sealed class SaveManagerWindowAsset : EditorWindowAsset
     {
         [SerializeField] internal bool useCustomDirectory;
         [SerializeField] internal SpecialFolders specialFolders;
