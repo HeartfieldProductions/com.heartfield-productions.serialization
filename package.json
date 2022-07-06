@@ -1,6 +1,6 @@
 {
   "name": "com.heartfield-productions.serialization",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "displayName": "Heartfield Productions Save/Load System",
   "description": "Save/Load game in external .sav file in slots",
   "author": {
@@ -8,6 +8,7 @@
   },
   "type": "Serialization",
   "dependencies": {
-    "com.heartfield-productions.core": ""
+    "com.heartfield-productions.core": "",
+    "com.unity.nuget.newtonsoft-json": "3.0.2"
   }
 }

@@ -4,16 +4,13 @@ using System.Runtime.Serialization;
 
 namespace Heartfield.Serialization
 {
-    sealed class TransformSerializationSurrogate : ISerializationSurrogate
+    sealed class TransformSerializationSurrogate : IHeartfieldSerializationSurrogate
     {
         const string p = "position";
         const string r = "rotation";
         const string s = "scale";
 
-        internal TransformSerializationSurrogate(out Type type)
-        {
-            type = typeof(Transform);
-        }
+        public Type SurrogateType => typeof(Transform);
 
         public void GetObjectData(object obj, SerializationInfo info, StreamingContext context)
         {

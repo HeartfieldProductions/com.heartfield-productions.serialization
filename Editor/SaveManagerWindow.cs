@@ -30,23 +30,8 @@ namespace HeartfieldEditor.Serialization
 
     sealed class SaveManagerWindow : EditorWindow<SaveManagerWindowAsset>
     {
-        static SaveManagerWindowAsset asset;
         static Type saveSettings;
-
         readonly object[] testSaveArgs = new object[] { "TestSave", 1 };
-
-        protected override SaveManagerWindowAsset GetAsset
-        {
-            get
-            {
-                if (asset == null)
-                    asset = new SaveManagerWindowAsset();
-
-                return asset;
-            }
-        }
-
-        protected override string AssetKey => "SaveManagerWindow";
 
         bool TargetPlatformIsMobileOrWeb => EditorUserBuildSettings.activeBuildTarget == BuildTarget.iOS ||
                                             EditorUserBuildSettings.activeBuildTarget == BuildTarget.Android ||
@@ -69,62 +54,92 @@ namespace HeartfieldEditor.Serialization
         {
             string directory = string.Empty;
 
-            if (asset.includeCompanyName)
+            if (GetAsset.includeCompanyName)
                 directory = Path.Combine(root, Application.companyName);
 
-            if (asset.includeProductName)
+            if (GetAsset.includeProductName)
             {
-                if (asset.includeCompanyName)
+                if (GetAsset.includeCompanyName)
                     directory = Path.Combine(directory, Application.productName);
                 else
                     directory = Path.Combine(root, Application.productName);
             }
 
-            if (asset.includeCompanyName || asset.includeProductName)
-                directory = Path.Combine(directory, asset.path);
+            const string path = "Saves";
+
+            if (GetAsset.includeCompanyName || GetAsset.includeProductName)
+                directory = Path.Combine(directory, path);
             else
-                directory = Path.Combine(root, asset.path);
+                directory = Path.Combine(root, path);
 
             return directory;
         }
 
-        void CheckSavePath()
+        void CreateTextAsset()
         {
-            bool useGameDataPath = asset.specialFolders == SpecialFolders.GameData;
+            string[] guids = AssetDatabase.FindAssets($"t:Script {nameof(SaveSettingsInfo)}");
 
-            if (!asset.useCustomDirectory)
+            if (guids == null || guids.Length == 0)
+                return;
+
+            string fullPath = AssetDatabase.GUIDToAssetPath(guids[0]);
+            int index = fullPath.Length - "Editor/SaveSettingsInfo.cs".Length;
+            string path = fullPath.Remove(index);
+            string runtimePath = $"{path}Runtime";
+
+            var resolution = GetAsset.screenshotNativeResolution ? new Vector2Int(Screen.currentResolution.width, Screen.currentResolution.height) : GetAsset.screenshotResolution;
+
+            var info = new SaveSettingsInfo
             {
-                asset.rootDirectory = Application.persistentDataPath;
-                asset.finalPath = asset.rootDirectory;
+                useCustomDirectory = GetAsset.useCustomDirectory,
+                specialFolders = GetAsset.specialFolders,
+                includeCompanyName = GetAsset.includeCompanyName,
+                includeProductName = GetAsset.includeProductName,
+                displayNameMode = GetAsset.displayNameMode,
+                takeScreenshot = GetAsset.takeScreenshot,
+                screenshotNativeResolution = GetAsset.screenshotNativeResolution,
+                screenshotResolution = resolution
+            };
+
+            File.WriteAllText($"{runtimePath}/SaveSettings.json", JsonUtility.ToJson(info));
+            AssetDatabase.Refresh();
+        }
+
+        void CheckPath()
+        {
+            bool useGameDataPath = GetAsset.specialFolders == SpecialFolders.GameData;
+
+            if (!GetAsset.useCustomDirectory)
+            {
+                GetAsset.rootDirectory = Application.persistentDataPath;
+                GetAsset.finalPath = GetAsset.rootDirectory;
             }
             else
             {
                 if (useGameDataPath)
-                    asset.rootDirectory = Application.dataPath;
+                    GetAsset.rootDirectory = Application.dataPath;
                 else
-                    asset.rootDirectory = Environment.GetFolderPath((Environment.SpecialFolder)asset.specialFolders);
+                    GetAsset.rootDirectory = Environment.GetFolderPath((Environment.SpecialFolder)GetAsset.specialFolders);
 
-                asset.finalPath = GetDirectory(asset.rootDirectory);
+                GetAsset.finalPath = GetDirectory(GetAsset.rootDirectory);
             }
-
-            saveSettings.SetFieldValue("fileExtension", asset.extension);
 
             if (TargetPlatformIsLinux)
-                asset.validFolder = asset.specialFolders != SpecialFolders.Favorites && asset.specialFolders != SpecialFolders.InternetCache && asset.specialFolders != SpecialFolders.ProgramFiles;
+                GetAsset.validFolder = GetAsset.specialFolders != SpecialFolders.Favorites && GetAsset.specialFolders != SpecialFolders.InternetCache && GetAsset.specialFolders != SpecialFolders.ProgramFiles;
             else
-                asset.validFolder = true;
+                GetAsset.validFolder = true;
 
-            if (asset.validFolder)
+            if (GetAsset.validFolder)
             {
-                saveSettings.SetFieldValue("path", asset.extension);
+                saveSettings.SetFieldValue("directory", GetAsset.finalPath);
 
                 if (useGameDataPath)
-                    asset.previewPath = $"{GetDirectory("path to executablename_Data folder")}/{saveSettings.GetMethodValue<string>("GetFilePath", testSaveArgs)}";
+                    GetAsset.previewPath = $"{GetDirectory(".../Data")}/{saveSettings.GetMethodValue<string>("GetFilePath", testSaveArgs)}";
                 else
-                    asset.previewPath = saveSettings.GetMethodValue<string>("GetFullFilePath", testSaveArgs);
+                    GetAsset.previewPath = saveSettings.GetMethodValue<string>("GetFilePath", testSaveArgs);
             }
             else
-                asset.previewPath = "Invalid path. Please choose another Special Folder";
+                GetAsset.previewPath = "Invalid path. Please choose another Special Folder";
         }
 
         protected override void OnEnable()
@@ -132,11 +147,16 @@ namespace HeartfieldEditor.Serialization
             base.OnEnable();
 
             if (saveSettings == null)
-            {
-                saveSettings = EditorUtilities.GetClassType("heartfield.serialization", "Heartfield.Serialization.SaveSettings");
-            }
+                saveSettings = EditorUtilities.GetClassType("Heartfield.Serialization", "Heartfield.Serialization.SaveSettings");
 
-            CheckSavePath();
+            CheckPath();
+        }
+
+        public override void SaveChanges()
+        {
+            base.SaveChanges();
+            CheckPath();
+            CreateTextAsset();
         }
 
         bool TargetPlatformIsCurrentPlatform()
@@ -148,6 +168,137 @@ namespace HeartfieldEditor.Serialization
             return onLinux || onWindows || onOSX;
         }
 
+        void DrawCustomDirectoryGUI()
+        {
+            EditorGUI.BeginDisabledGroup(TargetPlatformIsMobileOrWeb);
+            EditorGUI.BeginChangeCheck();
+            GetAsset.useCustomDirectory = EditorGUILayout.BeginToggleGroup("Use Custom Directory", GetAsset.useCustomDirectory);
+
+            EditorGUILayout.BeginVertical(EditorStyles.inspectorDefaultMargins);
+            GetAsset.specialFolders = (SpecialFolders)EditorGUILayout.EnumPopup("Special Folders", GetAsset.specialFolders);
+
+            bool usingGameDataFolder = GetAsset.specialFolders == SpecialFolders.GameData;
+
+            EditorGUI.BeginDisabledGroup(usingGameDataFolder);
+            GetAsset.includeCompanyName = EditorGUILayout.Toggle("Include Company Name", GetAsset.includeCompanyName);
+            GetAsset.includeProductName = EditorGUILayout.Toggle("Include Product Name", GetAsset.includeProductName);
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                if (TargetPlatformIsMobileOrWeb)
+                    GetAsset.useCustomDirectory = false;
+
+                if (usingGameDataFolder)
+                {
+                    GetAsset.includeCompanyName = false;
+                    GetAsset.includeProductName = false;
+                }
+
+                CheckPath();
+                GetAsset.hasChangesNotSaved = true;
+            }
+
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.EndToggleGroup();
+            EditorGUI.EndDisabledGroup();
+
+            EditorGUILayout.Separator();
+
+            if (TargetPlatformIsCurrentPlatform())
+            {
+                var messageType = GetAsset.validFolder ? MessageType.Info : MessageType.Error;
+                EditorGUILayout.HelpBox($"Destination preview: {GetAsset.previewPath}", messageType);
+            }
+        }
+
+        void DrawMoreSettingsGUI()
+        {
+            GetAsset.showMoreSettings = EditorGUILayout.BeginFoldoutHeaderGroup(GetAsset.showMoreSettings, "More Settings");
+
+            if (GetAsset.showMoreSettings)
+            {
+                EditorGUI.BeginChangeCheck();
+                EditorGUILayout.BeginVertical(EditorStyles.inspectorDefaultMargins);
+                GetAsset.takeScreenshot = EditorGUILayout.BeginToggleGroup("Take Screenshot", GetAsset.takeScreenshot);
+
+                if (GetAsset.takeScreenshot)
+                {
+                    EditorGUILayout.BeginVertical(EditorStyles.inspectorDefaultMargins);
+                    EditorGUILayout.BeginVertical("Box");
+
+                    EditorGUILayout.Separator();
+
+                    GetAsset.screenshotNativeResolution = EditorGUILayout.Toggle("Native Resolution", GetAsset.screenshotNativeResolution);
+
+                    EditorGUI.BeginDisabledGroup(GetAsset.screenshotNativeResolution);
+
+                    EditorGUILayout.BeginHorizontal();
+                    GetAsset.screenshotResolution = EditorGUILayout.Vector2IntField("Resolution", GetAsset.screenshotResolution);
+                    EditorGUILayout.EndHorizontal();
+
+                    EditorGUI.EndDisabledGroup();
+
+                    EditorGUILayout.EndVertical();
+                    EditorGUILayout.EndVertical();
+                }
+
+                EditorGUILayout.EndToggleGroup();
+                EditorGUILayout.EndVertical();
+
+                if (EditorGUI.EndChangeCheck())
+                {
+                    GetAsset.hasChangesNotSaved = true;
+                }
+            }
+
+            EditorGUILayout.EndFoldoutHeaderGroup();
+        }
+
+        void DrawGUI()
+        {
+            DrawCustomDirectoryGUI();
+
+            EditorGUILayout.Separator();
+
+            DrawMoreSettingsGUI();
+        }
+
+        void DrawDebugGUI()
+        {
+            EditorGUI.BeginDisabledGroup(!GetAsset.validFolder || !TargetPlatformIsCurrentPlatform());
+            
+            EditorGUILayout.BeginHorizontal();
+            
+            GUILayout.FlexibleSpace();
+            
+            EditorGUI.BeginDisabledGroup(Application.isPlaying);
+            EditorGUILayout.BeginVertical();
+            if (GUILayout.Button("Create Test Save Data", EditorStyles.miniButtonRight))
+            {
+                SaveManager.Save((string)testSaveArgs[0], (int)testSaveArgs[1]);
+            }
+
+            if (GUILayout.Button("Load Test Save Data", EditorStyles.miniButtonRight))
+            {
+                SaveManager.Load((string)testSaveArgs[0], (int)testSaveArgs[1]);
+            }
+            EditorGUILayout.EndVertical();
+            EditorGUI.EndDisabledGroup();
+
+            if (GUILayout.Button("Open Directory", EditorStyles.miniButtonRight))
+            {
+                string path = saveSettings.GetFieldValue<string>("directory");
+
+                if (Directory.Exists(path))
+                    Process.Start(path);
+                else
+                    Process.Start(GetAsset.rootDirectory);
+            }
+            EditorGUILayout.EndHorizontal();
+            
+            EditorGUI.EndDisabledGroup();
+        }
+
         void OnGUI()
         {
             EditorGUILayout.Separator();
@@ -156,70 +307,31 @@ namespace HeartfieldEditor.Serialization
 
             EditorGUILayoutExtension.DrawSeparatorLine();
 
-            EditorGUI.BeginDisabledGroup(TargetPlatformIsMobileOrWeb);
-            EditorGUI.BeginChangeCheck();
-            asset.useCustomDirectory = EditorGUILayout.BeginToggleGroup("Use Custom Directory", asset.useCustomDirectory);
+            DrawGUI();
 
-            EditorGUILayout.BeginVertical(EditorStyles.inspectorDefaultMargins);
-            asset.specialFolders = (SpecialFolders)EditorGUILayout.EnumPopup("Special Folders", asset.specialFolders);
+            EditorGUILayout.Separator();
+            EditorGUILayout.BeginHorizontal();
 
-            bool usingGameDataFolder = asset.specialFolders == SpecialFolders.GameData;
-
-            EditorGUI.BeginDisabledGroup(usingGameDataFolder);
-            asset.includeCompanyName = EditorGUILayout.Toggle("Include Company Name", asset.includeCompanyName);
-            asset.includeProductName = EditorGUILayout.Toggle("Include Product Name", asset.includeProductName);
-            EditorGUI.EndDisabledGroup();
-
-            if (usingGameDataFolder)
+            if (GUILayout.Button("Save Changes"))
             {
-                asset.includeCompanyName = false;
-                asset.includeProductName = false;
-            }
-
-            asset.path = EditorGUILayout.TextField("Path", asset.path);
-            asset.extension = EditorGUILayout.TextField("Extension", asset.extension);
-            EditorGUILayout.EndVertical();
-
-            EditorGUILayout.EndToggleGroup();
-            if (EditorGUI.EndChangeCheck())
-            {
-                if (TargetPlatformIsMobileOrWeb)
-                    asset.useCustomDirectory = false;
-
-                CheckSavePath();
                 SaveChanges();
             }
-            EditorGUI.EndDisabledGroup();
 
-            EditorGUILayout.Separator();
-
-            if (TargetPlatformIsCurrentPlatform())
-                EditorGUILayout.HelpBox($"Destination preview: {asset.previewPath}", asset.validFolder ? MessageType.Info : MessageType.Error);
-
-            EditorGUILayout.Separator();
-
-            EditorGUI.BeginDisabledGroup(!asset.validFolder || !TargetPlatformIsCurrentPlatform());
-
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.FlexibleSpace();
-            EditorGUI.BeginDisabledGroup(Application.isPlaying);
-            if (GUILayout.Button("Create Test Save Data", EditorStyles.miniButtonRight))
+            if (GUILayout.Button("Revert Defaults"))
             {
-                SaveManager.Save((string)testSaveArgs[0], (int)testSaveArgs[1], out _);
+                GetAsset.RevertDefults();
             }
-            EditorGUI.EndDisabledGroup();
 
-            if (GUILayout.Button("Open Directory", EditorStyles.miniButtonRight))
-            {
-                string path = saveSettings.GetFieldValue<string>("path");
-
-                if (Directory.Exists(path))
-                    Process.Start(path);
-                else
-                    Process.Start(asset.rootDirectory);
-            }
             EditorGUILayout.EndHorizontal();
-            EditorGUI.EndDisabledGroup();
+
+            if (GetAsset.hasChangesNotSaved)
+            {
+                EditorGUILayout.HelpBox("There's changes not saved!", MessageType.Warning);
+            }
+
+            EditorGUILayoutExtension.DrawSeparatorLine();
+
+            DrawDebugGUI();
         }
     }
 }

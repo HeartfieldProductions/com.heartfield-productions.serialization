@@ -1,8 +1,7 @@
 {
-    "name": "heartfield-editor.serialization",
-    "rootNamespace": "",
+    "name": "Heartfield.Serialization.Tests",
+    "rootNamespace": "Heartfield.Serialization.Tests",
     "references": [
-        "GUID:92c74422f5010674baadf032e1479b48",
         "GUID:e34156bc356b3444991ba3a40e2c0600"
     ],
     "includePlatforms": [

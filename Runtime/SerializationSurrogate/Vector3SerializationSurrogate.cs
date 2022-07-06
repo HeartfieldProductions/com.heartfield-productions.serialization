@@ -5,14 +5,11 @@ using System.Runtime.Serialization;
 namespace Heartfield.Serialization
 {
     #region Vector3
-    sealed class Vector3SerializationSurrogate : ISerializationSurrogate
+    sealed class Vector3SerializationSurrogate : IHeartfieldSerializationSurrogate
     {
         readonly string[] _vector = new string[] { "x", "y", "z" };
 
-        internal Vector3SerializationSurrogate(out Type type)
-        {
-            type = typeof(Vector3);
-        }
+        public Type SurrogateType => typeof(Vector3);
 
         public void GetObjectData(object obj, SerializationInfo info, StreamingContext context)
         {
@@ -39,14 +36,11 @@ namespace Heartfield.Serialization
     #endregion
 
     #region Vector2
-    sealed class Vector2SerializationSurrogate : ISerializationSurrogate
+    sealed class Vector2SerializationSurrogate : IHeartfieldSerializationSurrogate
     {
         readonly string[] _vector = new string[] { "x", "y" };
 
-        internal Vector2SerializationSurrogate(out Type type)
-        {
-            type = typeof(Vector2);
-        }
+        public Type SurrogateType => typeof(Vector2);
 
         public void GetObjectData(object obj, SerializationInfo info, StreamingContext context)
         {
@@ -71,14 +65,11 @@ namespace Heartfield.Serialization
     #endregion
 
     #region Vector4
-    sealed class Vector4SerializationSurrogate : ISerializationSurrogate
+    sealed class Vector4SerializationSurrogate : IHeartfieldSerializationSurrogate
     {
         readonly string[] _vector = new string[] { "x", "y", "z", "w" };
 
-        internal Vector4SerializationSurrogate(out Type type)
-        {
-            type = typeof(Vector4);
-        }
+        public Type SurrogateType => typeof(Vector4);
 
         public void GetObjectData(object obj, SerializationInfo info, StreamingContext context)
         {

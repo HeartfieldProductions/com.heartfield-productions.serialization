@@ -1,10 +1,13 @@
 {
-    "name": "Heartfield.Serialization",
-    "rootNamespace": "Heartfield.Serialization",
+    "name": "HeartfieldEditor.Serialization",
+    "rootNamespace": "HeartfieldEditor.Serialization",
     "references": [
-        "GUID:8c7130d203f708046af84729880abff5"
+        "GUID:92c74422f5010674baadf032e1479b48",
+        "GUID:e34156bc356b3444991ba3a40e2c0600"
     ],
-    "includePlatforms": [],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,

@@ -1,84 +1,151 @@
 using System;
+using System.IO;
+using System.Linq;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace Heartfield.Serialization
 {
     public static class SaveManager
     {
-        static SaveData _data = new SaveData();
-        
-        static List<ISaveable> _saveableObjects = new List<ISaveable>();
+        static Dictionary<object, SaveData> serializebleObjects = new Dictionary<object, SaveData>();
+        static GlobalData globalData = new GlobalData();
 
-        static int _totalPlayedTime = 0;
-        static int _lastPlayedTime = 0;
+        static HashSet<string> saveFilesPath = new HashSet<string>();
 
-        static int _currentSaveableId = 0;
-        static ISaveable _lastISaveable;
+        public delegate void SerializationEvents();
+        public static SerializationEvents OnPopulateSave;
+        public static SerializationEvents OnLoadFromSaveData;
+        public static SerializationEvents OnDeleteSaveData;
 
-        public static void UpdateTotalPlayedTime() => _totalPlayedTime++;
-        public static int GetTotalPlayedTime => _totalPlayedTime;
+        //public static void UpdateTotalPlayedTime() => _totalPlayedTime++;
+        //public static int GetTotalPlayedTime => _totalPlayedTime;
 
-        public static void RegisterSaveableObject(ISaveable obj) => _saveableObjects.Add(obj);
+        static void RegisterSaveableObject<T>(T source) => serializebleObjects.Add(source, new SaveData());
 
-        public static void AddData<T>(ISaveable saveable, T data) => _data.Add(GetPropertyHash(saveable, data), data);
+        public static T GetSavedData<T>(this object source) => (T)serializebleObjects[source].Get(source);
 
-        public static T GetData<T>(ISaveable saveable, T data) => _data.Get<T>(GetPropertyHash(saveable, data));
+        public static void GetSavedData<T>(this object source, ref T field) => field = serializebleObjects[source].Get(field);
 
-        static Hash128 GetPropertyHash<T>(ISaveable saveable, T property)
+        public static void AddDataToSave<T>(this object source, T field)
         {
-            var hash = new Hash128();
+            if (!serializebleObjects.ContainsKey(source))
+                RegisterSaveableObject(source);
 
-            if (_lastISaveable == saveable)
-                _currentSaveableId++;
-            else
-                _currentSaveableId = 0;
-
-            hash.Append(saveable.GetType().MetadataToken + property.GetType().MetadataToken + _currentSaveableId);
-
-            _lastISaveable = saveable;
-
-            return hash;
+            serializebleObjects[source].Add(field);
         }
 
-        public static void Save(string name, int slot, out bool isNewSave)
+        public static void AddDataToSave<T>(T source)
         {
-            _currentSaveableId = 0;
+            if (!serializebleObjects.ContainsKey(source))
+                RegisterSaveableObject(source);
 
-            PlayerPrefs.SetInt(PlayedTimeKey(slot), _totalPlayedTime + _lastPlayedTime);
+            serializebleObjects[source].Add(source);
+        }
 
-            for (int i = 0; i < _saveableObjects.Count; i++)
+        static void CreateGlobalData(string path)
+        {
+            globalData.lastSaveFilePath = path;
+            SerializationSystem.Serialize(globalData, SaveSettings.GetFilePath("GlobalData"));
+        }
+
+        public static void Save(string name, int slot)
+        {
+            OnPopulateSave?.Invoke();
+            CreateGlobalData(SaveSettings.GetFilePath(name, slot));
+            SerializationSystem.Serialize(serializebleObjects, globalData.lastSaveFilePath);//, slot, out isNewSave);
+        }
+
+        static string GetSaveFilePath(int slot)
+        {
+            //CheckDirectory();
+            return Directory.GetFiles(SaveSettings.directory).Where(a => a.EndsWith($"{slot:00}.sav")).ToArray()[0];
+        }
+
+        static void LoadGlobalData()
+        {
+            globalData = SerializationSystem.Deserialize<GlobalData>(SaveSettings.GetFilePath("GlobalData"));
+        }
+
+        public static void Load(string name, int slot)
+        {
+            LoadGlobalData();
+            serializebleObjects = SerializationSystem.Deserialize<Dictionary<object, SaveData>>(GetSaveFilePath(slot));
+            OnLoadFromSaveData?.Invoke();
+        }
+
+        public static void Delete(string name, int slot)
+        {
+            SerializationSystem.DeleteFile(GetSaveFilePath(slot));
+            OnDeleteSaveData?.Invoke();
+        }
+
+        public static int GetSaveFilesAmount => saveFilesPath.Count;
+
+        //public static int LastSaveDataSlot => lastSaveSlot;
+    }
+
+    [Serializable]
+    class TestClass2 : ISaveable
+    {
+        public void LoadFromSaveData()
+        {
+
+        }
+
+        public void PopulateSaveData()
+        {
+
+        }
+    }
+
+    [Serializable]
+    class TestClass
+    {
+        internal float a = float.MaxValue;
+        internal int b = int.MinValue;
+        internal bool c = true;
+        internal string d = "asdfghjk";
+        internal List<int> e = new List<int>() { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+        internal Dictionary<int, int> f = new Dictionary<int, int>() { { 1, 1 }, { 2, 2 }, { 3, 3 } };
+
+        [Serializable]
+        struct Temp
+        {
+            int g;
+
+            internal Temp(int g)
             {
-                _saveableObjects[i].PopulateSaveData();
+                this.g = g;
             }
-
-            SerializationSystem.Serialize(_data, name, slot, out isNewSave);
-
-            _data.Clear();
         }
 
-        public static void Load(int slot)
+        Temp tmp = new Temp(9);
+
+        void Awake()
         {
-            _currentSaveableId = 0;
-
-            _data = SerializationSystem.Deserialize(slot);
-
-            for (int i = 0; i < _saveableObjects.Count; i++)
-            {
-                _saveableObjects[i].LoadFromSaveData();
-            }
-
-            _lastPlayedTime = PlayerPrefs.GetInt(PlayedTimeKey(slot));
-            _totalPlayedTime = _lastPlayedTime;
-
-            _data.Clear();
+            SaveManager.OnPopulateSave += PopulateSaveData;
         }
 
-        static string PlayedTimeKey(int slot) => $"PlayedTime_{slot:00.00}";
+        void PopulateSaveData()
+        {
+            this.AddDataToSave(a);
+            this.AddDataToSave(b);
+            this.AddDataToSave(c);
+            this.AddDataToSave(d);
+            this.AddDataToSave(e);
+            this.AddDataToSave(f);
+            this.AddDataToSave(tmp);
+        }
 
-        public static void OnDelete(int slot) => SerializationSystem.DeleteSaveFile(slot);
-
-        public static int SaveFilesAmount() => SerializationSystem.SaveFilesAmount();
-        public static int LastSaveDataSlot => SerializationSystem.GetLastSaveFileSlot();
+        void LoadFromSaveData()
+        {
+            this.GetSavedData(ref a);
+            this.GetSavedData(ref b);
+            this.GetSavedData(ref c);
+            this.GetSavedData(ref d);
+            this.GetSavedData(ref e);
+            this.GetSavedData(ref f);
+            this.GetSavedData(ref tmp);
+        }
     }
 }

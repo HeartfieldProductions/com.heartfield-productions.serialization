@@ -7,10 +7,43 @@ namespace Heartfield.Serialization
     [Serializable]
     sealed class SaveData
     {
-        Dictionary<Hash128, object> _data = new Dictionary<Hash128, object>();
+        Dictionary<int, object> data = new Dictionary<int, object>();
+        const string idKey = "lastsaveddataid";
+        int id = 0;
 
-        internal void Clear() => _data.Clear();
-        internal void Add<T>(Hash128 hash, T data) => _data.Add(hash, data);
-        internal T Get<T>(Hash128 hash) => (T)_data[hash];
+        internal SaveData()
+        {
+            id = PlayerPrefs.GetInt(idKey);
+            PlayerPrefs.SetInt(idKey, id + 1);
+        }
+
+        internal int GetID => id;
+
+        internal int GetDataIdentifier<T>(T data) => data.GetType().MetadataToken;
+
+        internal void Add<T>(T data)
+        {
+            int id = GetDataIdentifier(data);
+            
+            Debug.Log(id);
+            
+            if (!this.data.ContainsKey(id))
+                this.data.Add(id, data);
+            else
+                this.data[id] = data;
+        }
+
+        internal T Get<T>(T data)
+        {
+            int id = GetDataIdentifier(data);
+            Debug.Log(id);
+            return (T)this.data[id];
+        }
+
+        internal void Reset()
+        {
+            data.Clear();
+            PlayerPrefs.DeleteKey(idKey);
+        }
     }
 }

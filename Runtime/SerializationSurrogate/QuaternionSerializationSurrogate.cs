@@ -4,14 +4,11 @@ using System.Runtime.Serialization;
 
 namespace Heartfield.Serialization
 {
-    sealed class QuaternionSerializationSurrogate : ISerializationSurrogate
+    sealed class QuaternionSerializationSurrogate : IHeartfieldSerializationSurrogate
     {
         readonly string[] a = new string[] { "x", "y", "z", "w" };
 
-        internal QuaternionSerializationSurrogate(out Type type)
-        {
-            type = typeof(Quaternion);
-        }
+        public Type SurrogateType => typeof(Quaternion);
 
         public void GetObjectData(object obj, SerializationInfo info, StreamingContext context)
         {
