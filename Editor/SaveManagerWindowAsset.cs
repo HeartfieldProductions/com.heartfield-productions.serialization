@@ -11,9 +11,8 @@ namespace HeartfieldEditor.Serialization
         [SerializeField] internal SpecialFolders specialFolders;
         [SerializeField] internal bool includeCompanyName;
         [SerializeField] internal bool includeProductName;
-        [SerializeField] internal DisplayNameMode displayNameMode;
         [SerializeField] internal string rootDirectory;
-        [SerializeField] internal string finalPath;
+        [SerializeField] internal string finalDirectory;
         [SerializeField] internal string previewPath;
         [SerializeField] internal bool validFolder;
 
@@ -21,6 +20,9 @@ namespace HeartfieldEditor.Serialization
         [SerializeField] internal bool takeScreenshot;
         [SerializeField] internal bool screenshotNativeResolution;
         [SerializeField] internal Vector2Int screenshotResolution;
+        
+        [SerializeField] internal bool countTotalPlayedTime;
+        [SerializeField] internal bool countWhilePaused;
 
         public override void RevertDefults()
         {
@@ -28,10 +30,12 @@ namespace HeartfieldEditor.Serialization
             specialFolders = SpecialFolders.ApplicationData;
             includeCompanyName = true;
             includeProductName = true;
-            displayNameMode = DisplayNameMode.Name_DD_MM_YYYY_hh_mm_ss;
             takeScreenshot = true;
             screenshotNativeResolution = false;
             screenshotResolution = new Vector2Int(480, 270);
+
+            countTotalPlayedTime = true;
+            countWhilePaused = true;
         }
     }
 }

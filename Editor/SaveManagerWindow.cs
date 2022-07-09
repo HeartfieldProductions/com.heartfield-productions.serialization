@@ -4,7 +4,6 @@ using UnityEngine;
 using UnityEditor;
 using System.Diagnostics;
 using Heartfield.Serialization;
-using Debug = UnityEngine.Debug;
 
 namespace HeartfieldEditor.Serialization
 {
@@ -31,7 +30,7 @@ namespace HeartfieldEditor.Serialization
     sealed class SaveManagerWindow : EditorWindow<SaveManagerWindowAsset>
     {
         static Type saveSettings;
-        readonly object[] testSaveArgs = new object[] { "TestSave", 1 };
+        readonly object[] testSaveArgs = new object[] { "xxTestSave", 1 };
 
         bool TargetPlatformIsMobileOrWeb => EditorUserBuildSettings.activeBuildTarget == BuildTarget.iOS ||
                                             EditorUserBuildSettings.activeBuildTarget == BuildTarget.Android ||
@@ -75,34 +74,20 @@ namespace HeartfieldEditor.Serialization
             return directory;
         }
 
-        void CreateTextAsset()
+        void CreateSettingsAsset()
         {
-            string[] guids = AssetDatabase.FindAssets($"t:Script {nameof(SaveSettingsInfo)}");
+            var resolution = GetAsset.screenshotNativeResolution ? new Vector2Int(Screen.currentResolution.width, Screen.currentResolution.height) :
+                                                                    GetAsset.screenshotResolution;
 
-            if (guids == null || guids.Length == 0)
-                return;
-
-            string fullPath = AssetDatabase.GUIDToAssetPath(guids[0]);
-            int index = fullPath.Length - "Editor/SaveSettingsInfo.cs".Length;
-            string path = fullPath.Remove(index);
-            string runtimePath = $"{path}Runtime";
-
-            var resolution = GetAsset.screenshotNativeResolution ? new Vector2Int(Screen.currentResolution.width, Screen.currentResolution.height) : GetAsset.screenshotResolution;
-
-            var info = new SaveSettingsInfo
+            var settings = new SettingsSerialization
             {
-                useCustomDirectory = GetAsset.useCustomDirectory,
-                specialFolders = GetAsset.specialFolders,
-                includeCompanyName = GetAsset.includeCompanyName,
-                includeProductName = GetAsset.includeProductName,
-                displayNameMode = GetAsset.displayNameMode,
+                directory = GetAsset.finalDirectory,
                 takeScreenshot = GetAsset.takeScreenshot,
-                screenshotNativeResolution = GetAsset.screenshotNativeResolution,
-                screenshotResolution = resolution
+                screenshotResolution = resolution,
+                countTotalPlayedTime = GetAsset.countTotalPlayedTime
             };
 
-            File.WriteAllText($"{runtimePath}/SaveSettings.json", JsonUtility.ToJson(info));
-            AssetDatabase.Refresh();
+            settings.CreateAsset();
         }
 
         void CheckPath()
@@ -112,7 +97,7 @@ namespace HeartfieldEditor.Serialization
             if (!GetAsset.useCustomDirectory)
             {
                 GetAsset.rootDirectory = Application.persistentDataPath;
-                GetAsset.finalPath = GetAsset.rootDirectory;
+                GetAsset.finalDirectory = GetAsset.rootDirectory;
             }
             else
             {
@@ -121,7 +106,7 @@ namespace HeartfieldEditor.Serialization
                 else
                     GetAsset.rootDirectory = Environment.GetFolderPath((Environment.SpecialFolder)GetAsset.specialFolders);
 
-                GetAsset.finalPath = GetDirectory(GetAsset.rootDirectory);
+                GetAsset.finalDirectory = GetDirectory(GetAsset.rootDirectory);
             }
 
             if (TargetPlatformIsLinux)
@@ -131,12 +116,12 @@ namespace HeartfieldEditor.Serialization
 
             if (GetAsset.validFolder)
             {
-                saveSettings.SetFieldValue("directory", GetAsset.finalPath);
+                string path = SaveSettings.GetFilePath((string)testSaveArgs[0]);
 
                 if (useGameDataPath)
-                    GetAsset.previewPath = $"{GetDirectory(".../Data")}/{saveSettings.GetMethodValue<string>("GetFilePath", testSaveArgs)}";
+                    GetAsset.previewPath = $"{GetDirectory(".../Data")}/{path}";
                 else
-                    GetAsset.previewPath = saveSettings.GetMethodValue<string>("GetFilePath", testSaveArgs);
+                    GetAsset.previewPath = path;
             }
             else
                 GetAsset.previewPath = "Invalid path. Please choose another Special Folder";
@@ -156,7 +141,7 @@ namespace HeartfieldEditor.Serialization
         {
             base.SaveChanges();
             CheckPath();
-            CreateTextAsset();
+            CreateSettingsAsset();
         }
 
         bool TargetPlatformIsCurrentPlatform()
@@ -238,6 +223,11 @@ namespace HeartfieldEditor.Serialization
 
                     EditorGUI.EndDisabledGroup();
 
+                    EditorGUILayout.Separator();
+
+                    GetAsset.countTotalPlayedTime = EditorGUILayout.Toggle("Count Total Played Time", GetAsset.countTotalPlayedTime);
+                    GetAsset.countWhilePaused = EditorGUILayout.Toggle("Count While Paused", GetAsset.countWhilePaused);
+
                     EditorGUILayout.EndVertical();
                     EditorGUILayout.EndVertical();
                 }
@@ -254,33 +244,25 @@ namespace HeartfieldEditor.Serialization
             EditorGUILayout.EndFoldoutHeaderGroup();
         }
 
-        void DrawGUI()
-        {
-            DrawCustomDirectoryGUI();
-
-            EditorGUILayout.Separator();
-
-            DrawMoreSettingsGUI();
-        }
-
         void DrawDebugGUI()
         {
             EditorGUI.BeginDisabledGroup(!GetAsset.validFolder || !TargetPlatformIsCurrentPlatform());
-            
+
             EditorGUILayout.BeginHorizontal();
-            
+
             GUILayout.FlexibleSpace();
-            
+
             EditorGUI.BeginDisabledGroup(Application.isPlaying);
             EditorGUILayout.BeginVertical();
+
             if (GUILayout.Button("Create Test Save Data", EditorStyles.miniButtonRight))
             {
-                SaveManager.Save((string)testSaveArgs[0], (int)testSaveArgs[1]);
+                SaveManager.Save((int)testSaveArgs[1], Heartfield.Serialization.SaveType.Manual);
             }
 
             if (GUILayout.Button("Load Test Save Data", EditorStyles.miniButtonRight))
             {
-                SaveManager.Load((string)testSaveArgs[0], (int)testSaveArgs[1]);
+                //SaveManager.Load((string)testSaveArgs[0]);
             }
             EditorGUILayout.EndVertical();
             EditorGUI.EndDisabledGroup();
@@ -295,7 +277,7 @@ namespace HeartfieldEditor.Serialization
                     Process.Start(GetAsset.rootDirectory);
             }
             EditorGUILayout.EndHorizontal();
-            
+
             EditorGUI.EndDisabledGroup();
         }
 
@@ -307,11 +289,15 @@ namespace HeartfieldEditor.Serialization
 
             EditorGUILayoutExtension.DrawSeparatorLine();
 
-            DrawGUI();
+            DrawCustomDirectoryGUI();
 
             EditorGUILayout.Separator();
-            EditorGUILayout.BeginHorizontal();
 
+            DrawMoreSettingsGUI();
+
+            EditorGUILayout.Separator();
+
+            EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("Save Changes"))
             {
                 SaveChanges();
@@ -321,7 +307,6 @@ namespace HeartfieldEditor.Serialization
             {
                 GetAsset.RevertDefults();
             }
-
             EditorGUILayout.EndHorizontal();
 
             if (GetAsset.hasChangesNotSaved)

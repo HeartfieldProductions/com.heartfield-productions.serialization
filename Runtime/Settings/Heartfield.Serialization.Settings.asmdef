@@ -1,10 +1,7 @@
 {
-    "name": "Heartfield.Serialization",
+    "name": "Heartfield.Serialization.Settings",
     "rootNamespace": "Heartfield.Serialization",
-    "references": [
-        "GUID:8c7130d203f708046af84729880abff5",
-        "GUID:9ac050bf66a87ed4d8cfd24f91d6c701"
-    ],
+    "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

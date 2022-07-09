@@ -1,13 +1,13 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace Heartfield.Serialization
 {
-    struct GlobalData
+    class GlobalData
     {
         [SerializeField] internal int lastSaveSlot;
         [SerializeField] internal string lastSaveFilePath;
 
-        [SerializeField] internal int totalPlayedTime;
-        [SerializeField] internal int lastPlayedTime;
+        [SerializeField] internal HashSet<int> populatedSlots = new HashSet<int>();
     }
 }

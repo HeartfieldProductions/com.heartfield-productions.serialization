@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using UnityEngine;
 using Newtonsoft.Json;
 using System.Security.Cryptography;
 
@@ -20,7 +19,7 @@ namespace Heartfield.Serialization
             Directory.CreateDirectory(directory);
         }
 
-        internal static SerializedFileInfo Serialize<T>(T data, string path)
+        public static SerializedFileInfo Serialize<T>(T data, string path)
         {
             if (string.IsNullOrEmpty(path))
                 throw new ArgumentNullException("path should not be null or empty");
@@ -34,7 +33,7 @@ namespace Heartfield.Serialization
 
                 var encryptor = algorithm.CreateEncryptor();
 
-                using var fileStream = new FileStream(path, FileMode.Open);
+                using var fileStream = new FileStream(path, FileMode.OpenOrCreate);
                 using var cryptStream = new CryptoStream(fileStream, encryptor, CryptoStreamMode.Write);
                 using var streamWriter = new StreamWriter(cryptStream);
                 fileStream.Write(algorithm.IV, 0, algorithm.IV.Length);
@@ -46,9 +45,9 @@ namespace Heartfield.Serialization
                 throw;
             }
 
-#if UNITY_EDITOR
-            Debug.Log($"{Path.GetFileName(path)} saved succesfully at: {path}");
-#endif
+//#if UNITY_EDITOR
+//            Debug.Log($"{Path.GetFileName(path)} saved succesfully at: {Directory.GetParent(path)}");
+//#endif
 
             var info = new SerializedFileInfo()
             {
@@ -68,7 +67,7 @@ namespace Heartfield.Serialization
 
             try
             {
-                var decodedText = string.Empty;
+                var decodedData = string.Empty;
 
                 using (var algorithm = Rijndael.Create())
                 {
@@ -84,14 +83,14 @@ namespace Heartfield.Serialization
 
                     using var cryptStream = new CryptoStream(fileStream, decryptor, CryptoStreamMode.Read);
                     using var streamReader = new StreamReader(cryptStream);
-                    decodedText = streamReader.ReadToEnd();
+                    decodedData = streamReader.ReadToEnd();
                 }
 
-#if UNITY_EDITOR
-                Debug.Log($"{Path.GetFileName(path)} loaded succesfully");
-#endif
+//#if UNITY_EDITOR
+//                Debug.Log($"{Path.GetFileName(path)} loaded succesfully");
+//#endif
 
-                return JsonConvert.DeserializeObject<T>(decodedText);
+                return JsonConvert.DeserializeObject<T>(decodedData);
             }
             catch
             {

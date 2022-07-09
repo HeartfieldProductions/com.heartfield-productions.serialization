@@ -5,16 +5,26 @@ using System.Collections.Generic;
 namespace Heartfield.Serialization
 {
     [Serializable]
-    sealed class SaveData
+    public sealed class SaveData
     {
         Dictionary<int, object> data = new Dictionary<int, object>();
         const string idKey = "lastsaveddataid";
         int id = 0;
 
+        internal byte[] thumbnail;
+        internal float totalPlayedTime;
+
         internal SaveData()
         {
             id = PlayerPrefs.GetInt(idKey);
             PlayerPrefs.SetInt(idKey, id + 1);
+        }
+
+        internal Texture2D GetThumbnail(int width, int height)
+        {
+            var tex = new Texture2D(width, height);
+            tex.LoadRawTextureData(thumbnail);
+            return tex;
         }
 
         internal int GetID => id;
@@ -24,9 +34,9 @@ namespace Heartfield.Serialization
         internal void Add<T>(T data)
         {
             int id = GetDataIdentifier(data);
-            
+
             Debug.Log(id);
-            
+
             if (!this.data.ContainsKey(id))
                 this.data.Add(id, data);
             else

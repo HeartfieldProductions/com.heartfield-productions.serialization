@@ -1,85 +1,157 @@
 using System;
 using System.IO;
+using UnityEngine;
 using System.Linq;
+using System.Text;
+using System.Collections;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 
 namespace Heartfield.Serialization
 {
     public static class SaveManager
     {
-        static Dictionary<object, SaveData> serializebleObjects = new Dictionary<object, SaveData>();
+        /// <summary>
+        /// TKey is slot
+        /// TValue is path
+        /// </summary>
+        static Dictionary<int, string> savePaths = new Dictionary<int, string>(2);        
         static GlobalData globalData = new GlobalData();
 
-        static HashSet<string> saveFilesPath = new HashSet<string>();
+        const int MAX_QUICK_SAVES_AMOUNT = 10;
+        const int MAX_AUTO_SAVES_AMOUNT = 10;
+        const int MAX_CHECKPOINTS_SAVES_AMOUNT = 10;
+
+        static void LoadGlobalData()
+        {
+            string path = SaveSettings.GetFilePath("GlobalData");
+
+            if (!File.Exists(path))
+                return;
+
+            globalData = SerializationSystem.Deserialize<GlobalData>(path);
+        }
+
+        static void CheckFiles()
+        {
+            savePaths.Clear();
+            var paths = Directory.GetFiles(SaveSettings.Directory, "*.sav").
+                                            Where(file => Regex.IsMatch(Path.GetFileName(file), "^[0-9]+"));
+
+            foreach (var path in paths)
+            {
+                var name = Path.GetFileName(path);
+                var sb = new StringBuilder(name);
+                sb.Remove(2, name.Length - 2);
+                int slot = int.Parse(sb.ToString());
+                savePaths.Add(slot, path);
+            }
+        }
+
+        static SaveManager()
+        {
+            LoadGlobalData();
+            CheckFiles();
+
+#if UNITY_EDITOR
+            if (Application.isPlaying)
+#endif
+                ResumeTotalPlayedTime();
+        }
+
+        static Dictionary<object, SaveData> serializebleObjects = new Dictionary<object, SaveData>();
+
+        static Coroutine playedTimeCoroutine;
+        static float totalPlayedTime;
 
         public delegate void SerializationEvents();
         public static SerializationEvents OnPopulateSave;
         public static SerializationEvents OnLoadFromSaveData;
         public static SerializationEvents OnDeleteSaveData;
 
-        //public static void UpdateTotalPlayedTime() => _totalPlayedTime++;
-        //public static int GetTotalPlayedTime => _totalPlayedTime;
+        public static int GetTotalPlayedTime => Mathf.CeilToInt(totalPlayedTime);
 
-        static void RegisterSaveableObject<T>(T source) => serializebleObjects.Add(source, new SaveData());
+        public static void StopTotalPlayedTime()
+        {
+            if (playedTimeCoroutine != null)
+                MonoBehaviourHelper.StopCoroutine(playedTimeCoroutine);
+        }
 
-        public static T GetSavedData<T>(this object source) => (T)serializebleObjects[source].Get(source);
+        public static void ResumeTotalPlayedTime()
+        {
+            if (playedTimeCoroutine == null)
+                playedTimeCoroutine = MonoBehaviourHelper.StartCoroutine(TotalPlayedTimeCoroutine());
+        }
 
-        public static void GetSavedData<T>(this object source, ref T field) => field = serializebleObjects[source].Get(field);
+        public static T GetData<T>(this ISaveable source) => (T)serializebleObjects[source].Get(source);
 
-        public static void AddDataToSave<T>(this object source, T field)
+        public static void GetData<T>(this ISaveable source, ref T field) => field = serializebleObjects[source].Get(field);
+
+        public static void AddData<T>(this ISaveable source, T field)
         {
             if (!serializebleObjects.ContainsKey(source))
-                RegisterSaveableObject(source);
+                serializebleObjects.Add(source, new SaveData());
 
             serializebleObjects[source].Add(field);
         }
 
-        public static void AddDataToSave<T>(T source)
+        static IEnumerator TotalPlayedTimeCoroutine()
         {
-            if (!serializebleObjects.ContainsKey(source))
-                RegisterSaveableObject(source);
-
-            serializebleObjects[source].Add(source);
+            while (true)
+            {
+                totalPlayedTime += Time.unscaledDeltaTime;
+                yield return null;
+            }
         }
 
-        static void CreateGlobalData(string path)
+        public static void Save(int slot, SaveType type)
         {
+            var fileName = new StringBuilder();
+            fileName.Append(type);
+            fileName.Append(DateTime.Now.ToOADate());
+            fileName.Replace(',', '_');
+
+            if (type == SaveType.Auto)
+                slot += 100;
+            else if (type == SaveType.Checkpoint)
+                slot += 110;
+            else if (type == SaveType.Quick)
+                slot += 120;
+
+            string path = Path.Combine(SaveSettings.Directory, $"{slot:00}{fileName}.sav");
+
             globalData.lastSaveFilePath = path;
-            SerializationSystem.Serialize(globalData, SaveSettings.GetFilePath("GlobalData"));
-        }
+            SerializationSystem.Serialize(globalData, Path.Combine(SaveSettings.Directory, "GlobalData.sav"));
 
-        public static void Save(string name, int slot)
-        {
+            if (savePaths.ContainsKey(slot))
+            {
+                File.Move(savePaths[slot], path);
+                savePaths[slot] = path;
+            }
+            else
+                savePaths.Add(slot, path);
+
             OnPopulateSave?.Invoke();
-            CreateGlobalData(SaveSettings.GetFilePath(name, slot));
-            SerializationSystem.Serialize(serializebleObjects, globalData.lastSaveFilePath);//, slot, out isNewSave);
+            SerializationSystem.Serialize(serializebleObjects, path);
+
+            Debug.Log($"Saved files amount: {savePaths.Count()}");
         }
 
-        static string GetSaveFilePath(int slot)
+        public static void Load(int slot)
         {
-            //CheckDirectory();
-            return Directory.GetFiles(SaveSettings.directory).Where(a => a.EndsWith($"{slot:00}.sav")).ToArray()[0];
-        }
-
-        static void LoadGlobalData()
-        {
-            globalData = SerializationSystem.Deserialize<GlobalData>(SaveSettings.GetFilePath("GlobalData"));
-        }
-
-        public static void Load(string name, int slot)
-        {
+            CheckFiles();
             LoadGlobalData();
-            serializebleObjects = SerializationSystem.Deserialize<Dictionary<object, SaveData>>(GetSaveFilePath(slot));
+            serializebleObjects = SerializationSystem.Deserialize<Dictionary<object, SaveData>>(savePaths[slot]);
             OnLoadFromSaveData?.Invoke();
         }
 
-        public static void Delete(string name, int slot)
+        public static void Delete(int slot)
         {
-            SerializationSystem.DeleteFile(GetSaveFilePath(slot));
+            SerializationSystem.DeleteFile(savePaths[slot]);
             OnDeleteSaveData?.Invoke();
         }
 
-        public static int GetSaveFilesAmount => saveFilesPath.Count;
+        public static int GetSaveFilesAmount => savePaths.Count;
 
         //public static int LastSaveDataSlot => lastSaveSlot;
     }
@@ -99,7 +171,7 @@ namespace Heartfield.Serialization
     }
 
     [Serializable]
-    class TestClass
+    class TestClass : ISaveable
     {
         internal float a = float.MaxValue;
         internal int b = int.MinValue;
@@ -128,24 +200,34 @@ namespace Heartfield.Serialization
 
         void PopulateSaveData()
         {
-            this.AddDataToSave(a);
-            this.AddDataToSave(b);
-            this.AddDataToSave(c);
-            this.AddDataToSave(d);
-            this.AddDataToSave(e);
-            this.AddDataToSave(f);
-            this.AddDataToSave(tmp);
+            this.AddData(a);
+            this.AddData(b);
+            this.AddData(c);
+            this.AddData(d);
+            this.AddData(e);
+            this.AddData(f);
+            this.AddData(tmp);
         }
 
         void LoadFromSaveData()
         {
-            this.GetSavedData(ref a);
-            this.GetSavedData(ref b);
-            this.GetSavedData(ref c);
-            this.GetSavedData(ref d);
-            this.GetSavedData(ref e);
-            this.GetSavedData(ref f);
-            this.GetSavedData(ref tmp);
+            this.GetData(ref a);
+            this.GetData(ref b);
+            this.GetData(ref c);
+            this.GetData(ref d);
+            this.GetData(ref e);
+            this.GetData(ref f);
+            this.GetData(ref tmp);
+        }
+
+        void ISaveable.PopulateSaveData()
+        {
+            throw new NotImplementedException();
+        }
+
+        void ISaveable.LoadFromSaveData()
+        {
+            throw new NotImplementedException();
         }
     }
 }
