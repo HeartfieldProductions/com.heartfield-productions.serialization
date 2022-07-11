@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEditor;
 using System.Diagnostics;
 using Heartfield.Serialization;
+using SaveType = Heartfield.Serialization.SaveType;
 
 namespace HeartfieldEditor.Serialization
 {
@@ -88,6 +89,7 @@ namespace HeartfieldEditor.Serialization
             };
 
             settings.CreateAsset();
+            SaveSettings.LoadAsset();
         }
 
         void CheckPath()
@@ -121,7 +123,7 @@ namespace HeartfieldEditor.Serialization
                 if (useGameDataPath)
                     GetAsset.previewPath = $"{GetDirectory(".../Data")}/{path}";
                 else
-                    GetAsset.previewPath = path;
+                    GetAsset.previewPath = $"{GetAsset.finalDirectory}/{testSaveArgs[0]}.sav";
             }
             else
                 GetAsset.previewPath = "Invalid path. Please choose another Special Folder";
@@ -257,12 +259,12 @@ namespace HeartfieldEditor.Serialization
 
             if (GUILayout.Button("Create Test Save Data", EditorStyles.miniButtonRight))
             {
-                SaveManager.Save((int)testSaveArgs[1], Heartfield.Serialization.SaveType.Manual);
+                SaveManager.SaveToFile(SaveType.Manual);
             }
 
             if (GUILayout.Button("Load Test Save Data", EditorStyles.miniButtonRight))
             {
-                //SaveManager.Load((string)testSaveArgs[0]);
+                SaveManager.LoadFromFile(SaveType.Manual);// (string)testSaveArgs[0]);
             }
             EditorGUILayout.EndVertical();
             EditorGUI.EndDisabledGroup();

@@ -4,7 +4,6 @@ namespace Heartfield.Serialization
     {
         Quick,
         Manual,
-        Auto,
-        Checkpoint
+        Auto
     }
 }

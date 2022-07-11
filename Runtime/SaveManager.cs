@@ -3,7 +3,6 @@ using System.IO;
 using UnityEngine;
 using System.Linq;
 using System.Text;
-using System.Collections;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
@@ -11,32 +10,85 @@ namespace Heartfield.Serialization
 {
     public static class SaveManager
     {
+        const int MAX_QUICK_SAVES_AMOUNT = 10;
+        const int MAX_AUTO_SAVES_AMOUNT = 10;
+
         /// <summary>
         /// TKey is slot
         /// TValue is path
         /// </summary>
-        static Dictionary<int, string> savePaths = new Dictionary<int, string>(2);        
+        static Dictionary<int, string> manualSavePaths = new Dictionary<int, string>(1);
+        /// <summary>
+        /// TKey is slot
+        /// TValue is path
+        /// </summary>
+        static Dictionary<int, string> quickSavePaths = new Dictionary<int, string>(MAX_QUICK_SAVES_AMOUNT);
+        /// <summary>
+        /// TKey is slot
+        /// TValue is path
+        /// </summary>
+        static Dictionary<int, string> autoSavePaths = new Dictionary<int, string>(MAX_AUTO_SAVES_AMOUNT);
+
+        /// <summary>
+        /// TKey is Type id
+        /// TValue is Type Data
+        /// </summary>
+        static Dictionary<ushort, SaveData> datasToSave = new Dictionary<ushort, SaveData>();
+        static Dictionary<ISaveable, ushort> saveables = new Dictionary<ISaveable, ushort>();
+        static SaveDataMaster saveDataMaster = new SaveDataMaster();
         static GlobalData globalData = new GlobalData();
 
-        const int MAX_QUICK_SAVES_AMOUNT = 10;
-        const int MAX_AUTO_SAVES_AMOUNT = 10;
-        const int MAX_CHECKPOINTS_SAVES_AMOUNT = 10;
+        const string GLOBAL_DATA_NAME = "GlobalData";
+
+        public delegate void SerializationEvents();
+        public static SerializationEvents OnPopulateSave;
+        public static SerializationEvents OnFinishPopulateSave;
+        public static SerializationEvents OnLoadFromSave;
+        public static SerializationEvents OnFinishLoadSaveData;
+        public static SerializationEvents OnDeleteSaveData;
+
+        struct PlayedTimeInterval
+        {
+            internal DateTime from;
+            internal DateTime to;
+
+            internal PlayedTimeInterval(PlayedTimeInterval time)
+            {
+                from = time.from;
+                to = time.to;
+            }
+
+            internal TimeSpan GetTotalTime => to - from;
+        }
+
+        static HashSet<PlayedTimeInterval> playedTimeIntervals = new HashSet<PlayedTimeInterval>();
+        static PlayedTimeInterval currentPlayedTimeInterval = new PlayedTimeInterval();
+        static bool recordingPlayedTime;
 
         static void LoadGlobalData()
         {
-            string path = SaveSettings.GetFilePath("GlobalData");
+            string path = SaveSettings.GetFilePath(GLOBAL_DATA_NAME);
 
             if (!File.Exists(path))
-                return;
-
-            globalData = SerializationSystem.Deserialize<GlobalData>(path);
+                globalData.Reset();
+            else
+                globalData = SerializationSystem.Deserialize<GlobalData>(path);
         }
 
         static void CheckFiles()
         {
-            savePaths.Clear();
+            autoSavePaths.Clear();
+            manualSavePaths.Clear();
+            quickSavePaths.Clear();
+
+            if (!Directory.Exists(SaveSettings.Directory))
+                Directory.CreateDirectory(SaveSettings.Directory);
+
             var paths = Directory.GetFiles(SaveSettings.Directory, "*.sav").
                                             Where(file => Regex.IsMatch(Path.GetFileName(file), "^[0-9]+"));
+
+            const string auto = "Auto";
+            const string quick = "Quick";
 
             foreach (var path in paths)
             {
@@ -44,86 +96,147 @@ namespace Heartfield.Serialization
                 var sb = new StringBuilder(name);
                 sb.Remove(2, name.Length - 2);
                 int slot = int.Parse(sb.ToString());
-                savePaths.Add(slot, path);
+
+                if (name.Contains(auto))
+                    autoSavePaths.Add(slot, path);
+                else if (name.Contains(quick))
+                    quickSavePaths.Add(slot, path);
+                else
+                    manualSavePaths.Add(slot, path);
             }
         }
 
         static SaveManager()
         {
-            LoadGlobalData();
             CheckFiles();
-
-#if UNITY_EDITOR
-            if (Application.isPlaying)
-#endif
-                ResumeTotalPlayedTime();
+            LoadGlobalData();
         }
 
-        static Dictionary<object, SaveData> serializebleObjects = new Dictionary<object, SaveData>();
+        /// <summary>
+        /// Total time in hours
+        /// </summary>
+        /// <returns></returns>
+        public static int GetTotalPlayedTime()
+        {
+            var timeInterval = new PlayedTimeInterval(currentPlayedTimeInterval);
 
-        static Coroutine playedTimeCoroutine;
-        static float totalPlayedTime;
+            if (recordingPlayedTime)
+            {
+                timeInterval.to = DateTime.Now;
+            }
 
-        public delegate void SerializationEvents();
-        public static SerializationEvents OnPopulateSave;
-        public static SerializationEvents OnLoadFromSaveData;
-        public static SerializationEvents OnDeleteSaveData;
-
-        public static int GetTotalPlayedTime => Mathf.CeilToInt(totalPlayedTime);
+            return timeInterval.GetTotalTime.Hours;
+        }
 
         public static void StopTotalPlayedTime()
         {
-            if (playedTimeCoroutine != null)
-                MonoBehaviourHelper.StopCoroutine(playedTimeCoroutine);
+            if (!recordingPlayedTime)
+                return;
+
+            currentPlayedTimeInterval.to = DateTime.Now;
+
+            playedTimeIntervals.Add(currentPlayedTimeInterval);
+            currentPlayedTimeInterval = new PlayedTimeInterval();
+
+            recordingPlayedTime = false;
         }
 
         public static void ResumeTotalPlayedTime()
         {
-            if (playedTimeCoroutine == null)
-                playedTimeCoroutine = MonoBehaviourHelper.StartCoroutine(TotalPlayedTimeCoroutine());
+            if (recordingPlayedTime)
+                return;
+
+            currentPlayedTimeInterval.from = DateTime.Now;
+            recordingPlayedTime = true;
         }
 
-        public static T GetData<T>(this ISaveable source) => (T)serializebleObjects[source].Get(source);
-
-        public static void GetData<T>(this ISaveable source, ref T field) => field = serializebleObjects[source].Get(field);
-
-        public static void AddData<T>(this ISaveable source, T field)
+        #region ISaveable Extentions
+        public static void Register(this ISaveable saveable, int id = default)
         {
-            if (!serializebleObjects.ContainsKey(source))
-                serializebleObjects.Add(source, new SaveData());
-
-            serializebleObjects[source].Add(field);
-        }
-
-        static IEnumerator TotalPlayedTimeCoroutine()
-        {
-            while (true)
+            if (!saveables.ContainsKey(saveable))
             {
-                totalPlayedTime += Time.unscaledDeltaTime;
-                yield return null;
+                var guid = Crc16.Generate($"{saveable.GetType()}{id}");
+                saveables.Add(saveable, guid);
             }
         }
 
-        public static void Save(int slot, SaveType type)
+        public static void AddData<T>(this ISaveable saveable, T field)
         {
+            var id = saveables[saveable];
+
+            if (!datasToSave.ContainsKey(id))
+                datasToSave.Add(id, new SaveData());
+
+            datasToSave[id].AddData(field);         
+        }
+
+        public static void GetData<T>(this ISaveable saveable, ref T field)
+        {
+            var id = saveables[saveable];
+            var data = saveDataMaster.GetData(id);
+            field = data.GetData(field);
+        }
+        #endregion
+
+        static void SerializeGlobalData(SaveType type, string path)
+        {
+            if (type == SaveType.Auto)
+                globalData.lastAutoSavePath = path;
+            else if (type == SaveType.Manual)
+                globalData.lastManualSaveFilePath = path;
+            else
+                globalData.lastQuickSavePath = path;
+
+            SerializationSystem.Serialize(globalData, SaveSettings.GetFilePath(GLOBAL_DATA_NAME));
+        }
+
+        static Dictionary<int, string> GetSavePaths(SaveType type)
+        {
+            if (type == SaveType.Auto)
+                return autoSavePaths;
+            else if (type == SaveType.Manual)
+                return manualSavePaths;
+            else
+                return quickSavePaths;
+        }
+
+        static string GetSavePath(int slot, SaveType type) => GetSavePaths(type)[slot];
+
+        public static void SaveToFile(SaveType type, int slot = default)
+        {
+            CheckFiles();
+            LoadGlobalData();
+
+            int savesLimit = 0;
+            int lastSavedSlot;
+
+            if (type == SaveType.Auto)
+            {
+                savesLimit = MAX_AUTO_SAVES_AMOUNT;
+                lastSavedSlot = globalData.lastAutoSaveSlot;
+                slot = lastSavedSlot + 1;
+                globalData.lastAutoSaveSlot = slot;
+            }
+            else if (type == SaveType.Quick)
+            {
+                savesLimit = MAX_QUICK_SAVES_AMOUNT;
+                lastSavedSlot = globalData.lastQuickSaveSlot;
+                slot = lastSavedSlot + 1;
+                globalData.lastQuickSaveSlot = slot;
+            }
+
             var fileName = new StringBuilder();
             fileName.Append(type);
             fileName.Append(DateTime.Now.ToOADate());
             fileName.Replace(',', '_');
 
-            if (type == SaveType.Auto)
-                slot += 100;
-            else if (type == SaveType.Checkpoint)
-                slot += 110;
-            else if (type == SaveType.Quick)
-                slot += 120;
-
             string path = Path.Combine(SaveSettings.Directory, $"{slot:00}{fileName}.sav");
+            var savePaths = GetSavePaths(type);
 
-            globalData.lastSaveFilePath = path;
-            SerializationSystem.Serialize(globalData, Path.Combine(SaveSettings.Directory, "GlobalData.sav"));
+            bool overSlotLimit = type != SaveType.Manual && savePaths.Count >= savesLimit;
+            bool overrideSave = (savePaths.ContainsKey(slot) && type == SaveType.Manual) || overSlotLimit;
 
-            if (savePaths.ContainsKey(slot))
+            if (overrideSave)
             {
                 File.Move(savePaths[slot], path);
                 savePaths[slot] = path;
@@ -131,103 +244,58 @@ namespace Heartfield.Serialization
             else
                 savePaths.Add(slot, path);
 
-            OnPopulateSave?.Invoke();
-            SerializationSystem.Serialize(serializebleObjects, path);
+            Debug.Log($"Saveables amount: {saveables.Keys.Count}");
 
-            Debug.Log($"Saved files amount: {savePaths.Count()}");
+            foreach (var saveable in saveables.Keys)
+            {
+                saveable.OnPopulateSave();
+            }
+
+            Debug.Log($"Datas to Save amount: {datasToSave.Count}");
+
+            foreach (var saveData in datasToSave)
+            {
+                saveDataMaster.AddData(saveData);
+            }
+
+            saveDataMaster.path = path;
+
+            OnPopulateSave?.Invoke();
+            SerializationSystem.Serialize(saveDataMaster, path);
+
+            SerializeGlobalData(type, path);
+
+            OnFinishPopulateSave?.Invoke();
+
+            Debug.Log($"Saved {type}\nSave files amount: {savePaths.Count}");
         }
 
-        public static void Load(int slot)
+        public static void LoadFromFile(SaveType type, int slot = default)
         {
             CheckFiles();
             LoadGlobalData();
-            serializebleObjects = SerializationSystem.Deserialize<Dictionary<object, SaveData>>(savePaths[slot]);
-            OnLoadFromSaveData?.Invoke();
-        }
 
-        public static void Delete(int slot)
-        {
-            SerializationSystem.DeleteFile(savePaths[slot]);
-            OnDeleteSaveData?.Invoke();
-        }
+            if (type == SaveType.Auto)
+                slot = globalData.lastAutoSaveSlot;
+            else if (type == SaveType.Quick)
+                slot = globalData.lastQuickSaveSlot;
 
-        public static int GetSaveFilesAmount => savePaths.Count;
+            LoadGlobalData();
+            saveDataMaster = SerializationSystem.Deserialize<SaveDataMaster>(GetSavePath(slot, type));
+            OnLoadFromSave?.Invoke();
 
-        //public static int LastSaveDataSlot => lastSaveSlot;
-    }
-
-    [Serializable]
-    class TestClass2 : ISaveable
-    {
-        public void LoadFromSaveData()
-        {
-
-        }
-
-        public void PopulateSaveData()
-        {
-
-        }
-    }
-
-    [Serializable]
-    class TestClass : ISaveable
-    {
-        internal float a = float.MaxValue;
-        internal int b = int.MinValue;
-        internal bool c = true;
-        internal string d = "asdfghjk";
-        internal List<int> e = new List<int>() { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
-        internal Dictionary<int, int> f = new Dictionary<int, int>() { { 1, 1 }, { 2, 2 }, { 3, 3 } };
-
-        [Serializable]
-        struct Temp
-        {
-            int g;
-
-            internal Temp(int g)
+            foreach (var saveable in saveables.Keys)
             {
-                this.g = g;
+                saveable.OnLoadFromSave();
             }
+
+            Debug.Log($"Loaded {type}");
         }
 
-        Temp tmp = new Temp(9);
-
-        void Awake()
+        public static void DeleteFile(int slot, SaveType type)
         {
-            SaveManager.OnPopulateSave += PopulateSaveData;
-        }
-
-        void PopulateSaveData()
-        {
-            this.AddData(a);
-            this.AddData(b);
-            this.AddData(c);
-            this.AddData(d);
-            this.AddData(e);
-            this.AddData(f);
-            this.AddData(tmp);
-        }
-
-        void LoadFromSaveData()
-        {
-            this.GetData(ref a);
-            this.GetData(ref b);
-            this.GetData(ref c);
-            this.GetData(ref d);
-            this.GetData(ref e);
-            this.GetData(ref f);
-            this.GetData(ref tmp);
-        }
-
-        void ISaveable.PopulateSaveData()
-        {
-            throw new NotImplementedException();
-        }
-
-        void ISaveable.LoadFromSaveData()
-        {
-            throw new NotImplementedException();
+            OnDeleteSaveData?.Invoke();
+            SerializationSystem.DeleteFile(GetSavePath(slot, type));
         }
     }
 }

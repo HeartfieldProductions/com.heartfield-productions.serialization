@@ -2,7 +2,7 @@ namespace Heartfield.Serialization
 {
     public interface ISaveable
     {
-        void PopulateSaveData();
-        void LoadFromSaveData();
+        public void OnPopulateSave();
+        public void OnLoadFromSave();
     }
 }

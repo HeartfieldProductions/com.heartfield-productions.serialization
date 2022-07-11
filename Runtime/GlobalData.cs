@@ -1,13 +1,24 @@
 using UnityEngine;
-using System.Collections.Generic;
 
 namespace Heartfield.Serialization
 {
     class GlobalData
     {
-        [SerializeField] internal int lastSaveSlot;
-        [SerializeField] internal string lastSaveFilePath;
+        [SerializeField] internal string lastManualSaveFilePath;
 
-        [SerializeField] internal HashSet<int> populatedSlots = new HashSet<int>();
+        [SerializeField] internal string lastAutoSavePath;
+        [SerializeField] internal int lastAutoSaveSlot;
+
+        [SerializeField] internal string lastQuickSavePath;
+        [SerializeField] internal int lastQuickSaveSlot;
+
+        internal void Reset()
+        {
+            lastManualSaveFilePath = string.Empty;
+            lastAutoSavePath = string.Empty;
+            lastAutoSaveSlot = 0;
+            lastQuickSavePath = string.Empty;
+            lastQuickSaveSlot = 0;
+        }
     }
 }

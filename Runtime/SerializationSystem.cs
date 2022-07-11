@@ -9,7 +9,7 @@ namespace Heartfield.Serialization
     {
         static readonly byte[] KEY_BYTES = { 0x02, 0x03, 0x01, 0x03, 0x03, 0x07, 0x07, 0x08, 0x09, 0x09, 0x11, 0x11, 0x16, 0x17, 0x19, 0x16 };
 
-        static void CheckDirectory(string path)
+        internal static void CheckDirectory(string path)
         {
             string directory = Directory.GetParent(path).FullName;
 
@@ -26,9 +26,11 @@ namespace Heartfield.Serialization
 
             CheckDirectory(path);
 
+            bool fileExist = File.Exists(path);
+
             try
             {
-                using var algorithm = Rijndael.Create();
+                using var algorithm = Aes.Create();
                 algorithm.Key = KEY_BYTES;
 
                 var encryptor = algorithm.CreateEncryptor();
@@ -37,7 +39,7 @@ namespace Heartfield.Serialization
                 using var cryptStream = new CryptoStream(fileStream, encryptor, CryptoStreamMode.Write);
                 using var streamWriter = new StreamWriter(cryptStream);
                 fileStream.Write(algorithm.IV, 0, algorithm.IV.Length);
-                string jsonData = JsonConvert.SerializeObject(data);
+                string jsonData = JsonConvert.SerializeObject(data, Formatting.Indented);
                 streamWriter.Write(jsonData);
             }
             catch
@@ -45,14 +47,10 @@ namespace Heartfield.Serialization
                 throw;
             }
 
-//#if UNITY_EDITOR
-//            Debug.Log($"{Path.GetFileName(path)} saved succesfully at: {Directory.GetParent(path)}");
-//#endif
-
             var info = new SerializedFileInfo()
             {
-                newFile = true,
-                overrided = false
+                newFile = !fileExist,
+                overrided = fileExist
             };
 
             return info;
@@ -69,12 +67,12 @@ namespace Heartfield.Serialization
             {
                 var decodedData = string.Empty;
 
-                using (var algorithm = Rijndael.Create())
+                using (var algorithm = Aes.Create())
                 {
                     algorithm.Key = KEY_BYTES;
 
                     using var fileStream = new FileStream(path, FileMode.Open);
-                    byte[] iv = new byte[16];
+                    byte[] iv = new byte[KEY_BYTES.Length];
                     fileStream.Read(iv, 0, iv.Length);
 
                     algorithm.IV = iv;
@@ -86,10 +84,6 @@ namespace Heartfield.Serialization
                     decodedData = streamReader.ReadToEnd();
                 }
 
-//#if UNITY_EDITOR
-//                Debug.Log($"{Path.GetFileName(path)} loaded succesfully");
-//#endif
-
                 return JsonConvert.DeserializeObject<T>(decodedData);
             }
             catch
@@ -98,7 +92,7 @@ namespace Heartfield.Serialization
             }
         }
 
-        internal static void DeleteFile(string path)
+        public static void DeleteFile(string path)
         {
             if (!File.Exists(path))
                 throw new FileNotFoundException($"{path} doesn't exist");

@@ -9,6 +9,11 @@ namespace Heartfield.Serialization
 
         static SaveSettings()
         {
+            LoadAsset();
+        }
+
+        public static void LoadAsset()
+        {
             json.LoadAsset();
         }
 

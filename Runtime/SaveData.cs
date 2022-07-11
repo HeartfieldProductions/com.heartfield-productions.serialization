@@ -1,59 +1,36 @@
 using System;
-using UnityEngine;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 
 namespace Heartfield.Serialization
 {
     [Serializable]
-    public sealed class SaveData
+    sealed class SaveData
     {
-        Dictionary<int, object> data = new Dictionary<int, object>();
-        const string idKey = "lastsaveddataid";
-        int id = 0;
+        [JsonProperty] Dictionary<int, object> datas = new Dictionary<int, object>();
 
-        internal byte[] thumbnail;
-        internal float totalPlayedTime;
-
-        internal SaveData()
+        internal void AddData<T>(T field)
         {
-            id = PlayerPrefs.GetInt(idKey);
-            PlayerPrefs.SetInt(idKey, id + 1);
-        }
+            int id = field.GetType().MetadataToken;
 
-        internal Texture2D GetThumbnail(int width, int height)
-        {
-            var tex = new Texture2D(width, height);
-            tex.LoadRawTextureData(thumbnail);
-            return tex;
-        }
-
-        internal int GetID => id;
-
-        internal int GetDataIdentifier<T>(T data) => data.GetType().MetadataToken;
-
-        internal void Add<T>(T data)
-        {
-            int id = GetDataIdentifier(data);
-
-            Debug.Log(id);
-
-            if (!this.data.ContainsKey(id))
-                this.data.Add(id, data);
+            if (datas.ContainsKey(id))
+                datas[id] = field;
             else
-                this.data[id] = data;
+                datas.Add(field.GetType().MetadataToken, field);
         }
 
-        internal T Get<T>(T data)
+        internal T GetData<T>(T field)
         {
-            int id = GetDataIdentifier(data);
-            Debug.Log(id);
-            return (T)this.data[id];
-        }
+            int id = field.GetType().MetadataToken;
 
-        internal void Reset()
-        {
-            data.Clear();
-            PlayerPrefs.DeleteKey(idKey);
+            if (datas.ContainsKey(id))
+            {
+                var jToken = JToken.FromObject(datas[id]);
+                return jToken.ToObject<T>();
+            }
+            else
+                throw new NullReferenceException($"data for {field} does not exist");
         }
     }
 }
