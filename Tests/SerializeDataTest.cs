@@ -11,7 +11,10 @@ namespace Heartfield.Serialization.Tests
         [SerializeField] internal bool c = true;
         [SerializeField] internal string d = "asdfghjk";
         [SerializeField] internal List<int> e = new List<int>() { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
-        internal Dictionary<int, int> f = new Dictionary<int, int>() { { 1, 1 }, { 2, 2 }, { 3, 3 } };
+        Dictionary<int, Temp> f = new Dictionary<int, Temp>() { 
+            { 1, new Temp() { g = 7, test = "a" } },
+            { 2, new Temp() { g = 3, test = "b" } }, 
+            { 3, new Temp() { g = 10, test = "c" } } };
 
         [SerializeField] int id;
 
@@ -19,6 +22,7 @@ namespace Heartfield.Serialization.Tests
         struct Temp
         {
             [SerializeField] internal int g;
+            [SerializeField] internal string test;
         }
 
         [SerializeField] Temp tmp = new Temp();

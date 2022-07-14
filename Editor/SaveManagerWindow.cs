@@ -3,10 +3,8 @@ using System.IO;
 using UnityEngine;
 using UnityEditor;
 using System.Linq;
-using System.Text;
 using System.Diagnostics;
 using Heartfield.Serialization;
-using System.Collections.Generic;
 using Random = System.Random;
 using SaveType = Heartfield.Serialization.SaveType;
 
@@ -34,7 +32,6 @@ namespace HeartfieldEditor.Serialization
 
     sealed class SaveManagerWindow : EditorWindow<SaveManagerWindowAsset>
     {
-        static Type saveSettings;
         readonly object[] testSaveArgs = new object[] { "xxTestSave", 1 };
 
         bool TargetPlatformIsMobileOrWeb => EditorUserBuildSettings.activeBuildTarget == BuildTarget.iOS ||
@@ -136,9 +133,6 @@ namespace HeartfieldEditor.Serialization
         protected override void OnEnable()
         {
             base.OnEnable();
-
-            if (saveSettings == null)
-                saveSettings = EditorUtilities.GetClassType("Heartfield.Serialization", "Heartfield.Serialization.SaveSettings");
 
             CheckPath();
         }
@@ -268,14 +262,14 @@ namespace HeartfieldEditor.Serialization
 
             if (GUILayout.Button("Load Test Save Data", EditorStyles.miniButtonRight))
             {
-                SaveManager.LoadFromFile(SaveType.Manual);// (string)testSaveArgs[0]);
+                SaveManager.LoadFromFile(SaveType.Manual);
             }
             EditorGUILayout.EndVertical();
             EditorGUI.EndDisabledGroup();
 
             if (GUILayout.Button("Open Directory", EditorStyles.miniButtonRight))
             {
-                string path = saveSettings.GetFieldValue<string>("directory");
+                string path = SaveSettings.Directory;
 
                 if (Directory.Exists(path))
                     Process.Start(path);
@@ -285,15 +279,6 @@ namespace HeartfieldEditor.Serialization
             EditorGUILayout.EndHorizontal();
 
             EditorGUI.EndDisabledGroup();
-        }
-
-        static Random random = new Random();
-
-        static string RandomString(Random random, int length)
-        {
-            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz";
-            return new string(Enumerable.Repeat(chars, length)
-                .Select(s => s[random.Next(s.Length)]).ToArray());
         }
 
         void OnGUI()

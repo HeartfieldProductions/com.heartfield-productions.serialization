@@ -265,7 +265,7 @@ namespace Heartfield.Serialization
             SetupMasterData(path);
 
             OnPopulateSave?.Invoke();
-            SerializationSystem.Serialize(saveDataMaster, path, Newtonsoft.Json.Formatting.Indented);
+            SerializationSystem.Serialize(saveDataMaster, path, Newtonsoft.Json.Formatting.Indented, false);
 
             SerializeGlobalData(type, path);
 

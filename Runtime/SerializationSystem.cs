@@ -33,13 +33,14 @@ namespace Heartfield.Serialization
                 if (encrypt)
                 {
                     using var algorithm = Aes.Create();
+                    
                     algorithm.Key = KEY_BYTES;
-
                     var encryptor = algorithm.CreateEncryptor();
 
                     using var fileStream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite);
                     using var cryptStream = new CryptoStream(fileStream, encryptor, CryptoStreamMode.Write);
                     using var streamWriter = new StreamWriter(cryptStream);
+                    
                     fileStream.SetLength(0);
                     fileStream.Write(algorithm.IV, 0, algorithm.IV.Length);
                     string jsonData = JsonConvert.SerializeObject(data);
@@ -49,6 +50,7 @@ namespace Heartfield.Serialization
                 {
                     using var fileStream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite);
                     using var streamWriter = new StreamWriter(fileStream);
+                    
                     fileStream.SetLength(0);
                     string jsonData = JsonConvert.SerializeObject(data, formatting);
                     streamWriter.Write(jsonData);
@@ -68,7 +70,7 @@ namespace Heartfield.Serialization
             return info;
         }
 
-        public static T Deserialize<T>(string path)
+        public static T Deserialize<T>(string path, bool encrypted = false)
         {
             CheckDirectory(path);
 
@@ -77,10 +79,11 @@ namespace Heartfield.Serialization
 
             try
             {
-                var decodedData = string.Empty;
+                string decodedData;
 
-                using (var algorithm = Aes.Create())
+                if (encrypted)
                 {
+                    using var algorithm = Aes.Create();
                     algorithm.Key = KEY_BYTES;
 
                     using var fileStream = new FileStream(path, FileMode.Open);
@@ -93,6 +96,12 @@ namespace Heartfield.Serialization
 
                     using var cryptStream = new CryptoStream(fileStream, decryptor, CryptoStreamMode.Read);
                     using var streamReader = new StreamReader(cryptStream);
+                    decodedData = streamReader.ReadToEnd();
+                }
+                else
+                {
+                    using var fileStream = new FileStream(path, FileMode.Open);
+                    using var streamReader = new StreamReader(fileStream);
                     decodedData = streamReader.ReadToEnd();
                 }
 
