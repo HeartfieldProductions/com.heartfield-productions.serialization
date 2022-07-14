@@ -14,7 +14,7 @@ namespace Heartfield.Serialization
         [NonSerialized] Texture2D thumbnail;
         [JsonProperty] int totalPlayedTime;
 
-        [JsonProperty] Dictionary<ushort, SaveData> datas = new Dictionary<ushort, SaveData>();
+        [JsonProperty] Dictionary<int, SaveData> datas = new Dictionary<int, SaveData>();
 
         internal Texture2D GetThumbnail()
         {
@@ -29,7 +29,7 @@ namespace Heartfield.Serialization
 
         internal int GetTotalPlayedTime => totalPlayedTime;
 
-        internal void AddData(KeyValuePair<ushort, SaveData> data)
+        internal void AddData(KeyValuePair<int, SaveData> data)
         {
             var key = data.Key;
             var value = data.Value;
@@ -40,7 +40,7 @@ namespace Heartfield.Serialization
                 datas.Add(key, value);
         }
 
-        internal SaveData GetData(ushort id)
+        internal SaveData GetData(int id)
         {
             if (datas.ContainsKey(id))
             {

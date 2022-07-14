@@ -35,11 +35,12 @@ namespace Heartfield.Serialization
 
                 var encryptor = algorithm.CreateEncryptor();
 
-                using var fileStream = new FileStream(path, FileMode.OpenOrCreate);
+                using var fileStream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite);
                 using var cryptStream = new CryptoStream(fileStream, encryptor, CryptoStreamMode.Write);
                 using var streamWriter = new StreamWriter(cryptStream);
+                fileStream.SetLength(0);
                 fileStream.Write(algorithm.IV, 0, algorithm.IV.Length);
-                string jsonData = JsonConvert.SerializeObject(data, Formatting.Indented);
+                string jsonData = JsonConvert.SerializeObject(data);
                 streamWriter.Write(jsonData);
             }
             catch

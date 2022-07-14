@@ -3,12 +3,9 @@ using System.Text;
 
 namespace Heartfield.Serialization
 {
-    /// <summary>
-    /// Performs 32-bit reversed cyclic redundancy checks.
-    /// </summary>
-    struct Crc16
+    public struct Crc32
     {
-        static readonly ushort[] table = {
+        static readonly int[] table = {
             0x0000, 0x1189, 0x2312, 0x329B, 0x4624, 0x57AD, 0x6536, 0x74BF,
             0x8C48, 0x9DC1, 0xAF5A, 0xBED3, 0xCA6C, 0xDBE5, 0xE97E, 0xF8F7,
             0x1081, 0x0108, 0x3393, 0x221A, 0x56A5, 0x472C, 0x75B7, 0x643E,
@@ -43,20 +40,38 @@ namespace Heartfield.Serialization
             0x7BC7, 0x6A4E, 0x58D5, 0x495C, 0x3DE3, 0x2C6A, 0x1EF1, 0x0F78
         };
 
-        internal static ushort Generate(string input)
+        public static int Generate(string input)
         {
             if (string.IsNullOrEmpty(input))
                 throw new ArgumentNullException($"{input} can not be null or empty");
 
-            var buffer = Encoding.Unicode.GetBytes(input);
-            ushort crc = 0;
+            //var bytes = Encoding.ASCII.GetBytes(input);
+            int crc = 0;
 
-            for (int i = 0; i < buffer.Length; ++i)
+            for (int i = 0; i < input.Length; i++)
             {
-                crc = (ushort)((crc >> 8) ^ table[(crc ^ buffer[i]) & 0xff]);
+                crc = (crc << 8) ^ table[((crc >> 8) ^ input[i]) & 0xFF];
             }
 
             return crc;
+        }
+
+        public static string GenerateCRC(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                throw new ArgumentNullException($"{input} can not be null or empty");
+
+            //var bytes = Encoding.ASCII.GetBytes(input);
+            int crc = 0;
+            var sb = new StringBuilder();
+
+            for (int i = 0; i < input.Length; i++)
+            {
+                crc = (crc << 8) ^ table[((crc >> 8) ^ input[i]) & 0xFF];
+                sb.Append(crc);
+            }
+
+            return sb.ToString();
         }
     }
 }

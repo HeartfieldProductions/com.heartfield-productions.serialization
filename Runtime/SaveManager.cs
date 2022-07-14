@@ -33,12 +33,12 @@ namespace Heartfield.Serialization
         /// TKey is Type id
         /// TValue is Type Data
         /// </summary>
-        static Dictionary<ushort, SaveData> datasToSave = new Dictionary<ushort, SaveData>();
-        static Dictionary<ISaveable, ushort> saveables = new Dictionary<ISaveable, ushort>();
+        static Dictionary<int, SaveData> datasToSave = new Dictionary<int, SaveData>();
+        static Dictionary<ISaveable, int> saveables = new Dictionary<ISaveable, int>();
         static SaveDataMaster saveDataMaster = new SaveDataMaster();
         static GlobalData globalData = new GlobalData();
 
-        const string GLOBAL_DATA_NAME = "GlobalData";
+        const string GLOBAL_DATA_NAME = "GlobalSettings";
 
         public delegate void SerializationEvents();
         public static SerializationEvents OnPopulateSave;
@@ -155,8 +155,12 @@ namespace Heartfield.Serialization
         {
             if (!saveables.ContainsKey(saveable))
             {
-                var guid = Crc16.Generate($"{saveable.GetType()}{id}");
-                saveables.Add(saveable, guid);
+                //string key = $"{saveable.GetType()}{id}";
+                var hash = new StringBuilder();
+                hash.Append(saveable.GetType().MetadataToken);
+                hash.Append(id);
+                //var hash = Convert.ToBase64String(Encoding.ASCII.GetBytes(key));// Crc32.Generate(key);
+                saveables.Add(saveable, int.Parse(hash.ToString()));
             }
         }
 
