@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Heartfield.Serialization
 {
-    class GlobalData
+    class GlobalSettingsData
     {
         [SerializeField] internal string lastManualSaveFilePath;
 

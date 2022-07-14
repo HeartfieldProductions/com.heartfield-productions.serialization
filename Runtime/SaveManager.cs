@@ -36,9 +36,9 @@ namespace Heartfield.Serialization
         static Dictionary<int, SaveData> datasToSave = new Dictionary<int, SaveData>();
         static Dictionary<ISaveable, int> saveables = new Dictionary<ISaveable, int>();
         static SaveDataMaster saveDataMaster = new SaveDataMaster();
-        static GlobalData globalData = new GlobalData();
+        static GlobalSettingsData globalSettingsData = new GlobalSettingsData();
 
-        const string GLOBAL_DATA_NAME = "GlobalSettings";
+        const string SETTINGS_DATA_NAME = "Settings";
 
         public delegate void SerializationEvents();
         public static SerializationEvents OnPopulateSave;
@@ -67,12 +67,12 @@ namespace Heartfield.Serialization
 
         static void LoadGlobalData()
         {
-            string path = SaveSettings.GetFilePath(GLOBAL_DATA_NAME);
+            string path = SaveSettings.GetFilePath(SETTINGS_DATA_NAME);
 
             if (!File.Exists(path))
-                globalData.Reset();
+                globalSettingsData.Reset();
             else
-                globalData = SerializationSystem.Deserialize<GlobalData>(path);
+                globalSettingsData = SerializationSystem.Deserialize<GlobalSettingsData>(path);
         }
 
         static void CheckFiles()
@@ -185,13 +185,13 @@ namespace Heartfield.Serialization
         static void SerializeGlobalData(SaveType type, string path)
         {
             if (type == SaveType.Auto)
-                globalData.lastAutoSavePath = path;
+                globalSettingsData.lastAutoSavePath = path;
             else if (type == SaveType.Manual)
-                globalData.lastManualSaveFilePath = path;
+                globalSettingsData.lastManualSaveFilePath = path;
             else
-                globalData.lastQuickSavePath = path;
+                globalSettingsData.lastQuickSavePath = path;
 
-            SerializationSystem.Serialize(globalData, SaveSettings.GetFilePath(GLOBAL_DATA_NAME));
+            SerializationSystem.Serialize(globalSettingsData, SaveSettings.GetFilePath(SETTINGS_DATA_NAME));
         }
 
         static Dictionary<int, string> GetSavePaths(SaveType type)
@@ -217,16 +217,16 @@ namespace Heartfield.Serialization
             if (type == SaveType.Auto)
             {
                 savesLimit = MAX_AUTO_SAVES_AMOUNT;
-                lastSavedSlot = globalData.lastAutoSaveSlot;
+                lastSavedSlot = globalSettingsData.lastAutoSaveSlot;
                 slot = lastSavedSlot + 1;
-                globalData.lastAutoSaveSlot = slot;
+                globalSettingsData.lastAutoSaveSlot = slot;
             }
             else if (type == SaveType.Quick)
             {
                 savesLimit = MAX_QUICK_SAVES_AMOUNT;
-                lastSavedSlot = globalData.lastQuickSaveSlot;
+                lastSavedSlot = globalSettingsData.lastQuickSaveSlot;
                 slot = lastSavedSlot + 1;
-                globalData.lastQuickSaveSlot = slot;
+                globalSettingsData.lastQuickSaveSlot = slot;
             }
 
             var fileName = new StringBuilder();
@@ -280,9 +280,9 @@ namespace Heartfield.Serialization
             LoadGlobalData();
 
             if (type == SaveType.Auto)
-                slot = globalData.lastAutoSaveSlot;
+                slot = globalSettingsData.lastAutoSaveSlot;
             else if (type == SaveType.Quick)
-                slot = globalData.lastQuickSaveSlot;
+                slot = globalSettingsData.lastQuickSaveSlot;
 
             LoadGlobalData();
             saveDataMaster = SerializationSystem.Deserialize<SaveDataMaster>(GetSavePath(slot, type));

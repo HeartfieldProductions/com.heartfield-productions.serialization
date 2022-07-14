@@ -43,9 +43,7 @@ namespace Heartfield.Serialization
         internal SaveData GetData(int id)
         {
             if (datas.ContainsKey(id))
-            {
                 return datas[id];
-            }
             else
                 throw new NullReferenceException($"({id}) does not exist in this file");
         }
