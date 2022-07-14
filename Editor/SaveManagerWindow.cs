@@ -324,45 +324,6 @@ namespace HeartfieldEditor.Serialization
             }
             EditorGUILayout.EndHorizontal();
 
-            if (GUILayout.Button("CRC Test"))
-            {
-                const int COUNT = 5;
-                var sb = new StringBuilder();
-                int repeatedCount = 0;
-                var list = new List<string>(COUNT);
-
-                for (int i = 0; i < COUNT; i++)
-                {
-                    var text = RandomString(random, UnityEngine.Random.Range(20, 40));
-                    var crc = Convert.ToBase64String(Encoding.ASCII.GetBytes(text));// Crc32.GenerateCRC(text);
-
-                    if (list.Contains(crc))
-                    {
-                        repeatedCount++;
-                        //sb.Append(crc);
-                        //sb.Append("\n");
-                    }
-
-                    sb.Append(crc);
-                    sb.Append("\n");
-
-                    list.Add(crc);
-                    //sb.Append(crc);
-                    //sb.Append("\n");
-                }
-
-                if (repeatedCount > 0)
-                {
-                    UnityEngine.Debug.LogWarning($"Collisions amount: {repeatedCount}");
-                    UnityEngine.Debug.LogWarning(sb.ToString());
-                }
-                else
-                {
-                    UnityEngine.Debug.Log("No collisions detected");
-                    UnityEngine.Debug.Log(sb.ToString());
-                }
-            }
-
             if (GetAsset.hasChangesNotSaved)
             {
                 EditorGUILayout.HelpBox("There's changes not saved!", MessageType.Warning);

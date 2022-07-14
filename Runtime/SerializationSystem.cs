@@ -19,7 +19,7 @@ namespace Heartfield.Serialization
             Directory.CreateDirectory(directory);
         }
 
-        public static SerializedFileInfo Serialize<T>(T data, string path)
+        public static SerializedFileInfo Serialize<T>(T data, string path, Formatting formatting = Formatting.None, bool encrypt = false)
         {
             if (string.IsNullOrEmpty(path))
                 throw new ArgumentNullException("path should not be null or empty");
@@ -30,18 +30,29 @@ namespace Heartfield.Serialization
 
             try
             {
-                using var algorithm = Aes.Create();
-                algorithm.Key = KEY_BYTES;
+                if (encrypt)
+                {
+                    using var algorithm = Aes.Create();
+                    algorithm.Key = KEY_BYTES;
 
-                var encryptor = algorithm.CreateEncryptor();
+                    var encryptor = algorithm.CreateEncryptor();
 
-                using var fileStream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite);
-                using var cryptStream = new CryptoStream(fileStream, encryptor, CryptoStreamMode.Write);
-                using var streamWriter = new StreamWriter(cryptStream);
-                fileStream.SetLength(0);
-                fileStream.Write(algorithm.IV, 0, algorithm.IV.Length);
-                string jsonData = JsonConvert.SerializeObject(data);
-                streamWriter.Write(jsonData);
+                    using var fileStream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+                    using var cryptStream = new CryptoStream(fileStream, encryptor, CryptoStreamMode.Write);
+                    using var streamWriter = new StreamWriter(cryptStream);
+                    fileStream.SetLength(0);
+                    fileStream.Write(algorithm.IV, 0, algorithm.IV.Length);
+                    string jsonData = JsonConvert.SerializeObject(data);
+                    streamWriter.Write(jsonData);
+                }
+                else
+                {
+                    using var fileStream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+                    using var streamWriter = new StreamWriter(fileStream);
+                    fileStream.SetLength(0);
+                    string jsonData = JsonConvert.SerializeObject(data, formatting);
+                    streamWriter.Write(jsonData);
+                }
             }
             catch
             {

@@ -10,27 +10,35 @@ namespace Heartfield.Serialization
     {
         [JsonProperty] Dictionary<int, object> datas = new Dictionary<int, object>();
 
+        internal void AddData<T>(T data, int id)
+        {
+            if (datas.ContainsKey(id))
+                datas[id] = data;
+            else
+                datas.Add(id, data);
+        }
+
         internal void AddData<T>(T field)
         {
             int id = field.GetType().MetadataToken;
-
-            if (datas.ContainsKey(id))
-                datas[id] = field;
-            else
-                datas.Add(field.GetType().MetadataToken, field);
+            AddData(field, id);
         }
 
-        internal T GetData<T>(T field)
+        internal T GetData<T>(int id)
         {
-            int id = field.GetType().MetadataToken;
-
             if (datas.ContainsKey(id))
             {
                 var jToken = JToken.FromObject(datas[id]);
                 return jToken.ToObject<T>();
             }
             else
-                throw new NullReferenceException($"data for {field} does not exist");
+                throw new NullReferenceException($"data for ({id}) does not exist");
+        }
+
+        internal T GetData<T>(T field)
+        {
+            int id = field.GetType().MetadataToken;
+            return GetData<T>(id);
         }
     }
 }

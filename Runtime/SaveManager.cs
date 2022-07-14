@@ -35,9 +35,10 @@ namespace Heartfield.Serialization
         /// </summary>
         static Dictionary<int, SaveData> datasToSave = new Dictionary<int, SaveData>();
         static Dictionary<ISaveable, int> saveables = new Dictionary<ISaveable, int>();
-        static SaveDataMaster saveDataMaster = new SaveDataMaster();
+        static SaveData saveDataMaster = new SaveData();
         static GlobalSettingsData globalSettingsData = new GlobalSettingsData();
 
+        const int DATA_PATH_ID = 1000;
         const string SETTINGS_DATA_NAME = "Settings";
 
         public delegate void SerializationEvents();
@@ -155,11 +156,9 @@ namespace Heartfield.Serialization
         {
             if (!saveables.ContainsKey(saveable))
             {
-                //string key = $"{saveable.GetType()}{id}";
                 var hash = new StringBuilder();
                 hash.Append(saveable.GetType().MetadataToken);
                 hash.Append(id);
-                //var hash = Convert.ToBase64String(Encoding.ASCII.GetBytes(key));// Crc32.Generate(key);
                 saveables.Add(saveable, int.Parse(hash.ToString()));
             }
         }
@@ -177,7 +176,7 @@ namespace Heartfield.Serialization
         public static void GetData<T>(this ISaveable saveable, ref T field)
         {
             var id = saveables[saveable];
-            var data = saveDataMaster.GetData(id);
+            var data = saveDataMaster.GetData<SaveData>(id);
             field = data.GetData(field);
         }
         #endregion
@@ -205,6 +204,16 @@ namespace Heartfield.Serialization
         }
 
         static string GetSavePath(int slot, SaveType type) => GetSavePaths(type)[slot];
+
+        static void SetupMasterData(string path)
+        {
+            foreach (var saveData in datasToSave)
+            {
+                saveDataMaster.AddData(saveData.Value, saveData.Key);
+            }
+
+            saveDataMaster.AddData(path, DATA_PATH_ID);
+        }
 
         public static void SaveToFile(SaveType type, int slot = default)
         {
@@ -248,24 +257,15 @@ namespace Heartfield.Serialization
             else
                 savePaths.Add(slot, path);
 
-            Debug.Log($"Saveables amount: {saveables.Keys.Count}");
-
             foreach (var saveable in saveables.Keys)
             {
                 saveable.OnPopulateSave();
             }
 
-            Debug.Log($"Datas to Save amount: {datasToSave.Count}");
-
-            foreach (var saveData in datasToSave)
-            {
-                saveDataMaster.AddData(saveData);
-            }
-
-            saveDataMaster.path = path;
+            SetupMasterData(path);
 
             OnPopulateSave?.Invoke();
-            SerializationSystem.Serialize(saveDataMaster, path);
+            SerializationSystem.Serialize(saveDataMaster, path, Newtonsoft.Json.Formatting.Indented);
 
             SerializeGlobalData(type, path);
 
@@ -285,7 +285,7 @@ namespace Heartfield.Serialization
                 slot = globalSettingsData.lastQuickSaveSlot;
 
             LoadGlobalData();
-            saveDataMaster = SerializationSystem.Deserialize<SaveDataMaster>(GetSavePath(slot, type));
+            saveDataMaster = SerializationSystem.Deserialize<SaveData>(GetSavePath(slot, type));
             OnLoadFromSave?.Invoke();
 
             foreach (var saveable in saveables.Keys)
