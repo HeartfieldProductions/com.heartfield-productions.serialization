@@ -1,6 +1,6 @@
-using UnityEngine;
 using System;
-using Heartfield.Serialization;
+using UnityEngine;
+using UnityEditor.AnimatedValues;
 
 namespace HeartfieldEditor.Serialization
 {
@@ -17,7 +17,7 @@ namespace HeartfieldEditor.Serialization
         [SerializeField] internal bool validFolder;
 
         [SerializeField] internal bool showMoreSettings;
-        [SerializeField] internal bool takeScreenshot;
+        [SerializeField] internal AnimBool takeScreenshot = new();
         [SerializeField] internal bool screenshotNativeResolution;
         [SerializeField] internal Vector2Int screenshotResolution;
         
@@ -30,7 +30,7 @@ namespace HeartfieldEditor.Serialization
             specialFolders = SpecialFolders.ApplicationData;
             includeCompanyName = true;
             includeProductName = true;
-            takeScreenshot = true;
+            takeScreenshot.target = true;
             screenshotNativeResolution = false;
             screenshotResolution = new Vector2Int(480, 270);
 

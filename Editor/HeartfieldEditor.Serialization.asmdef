@@ -3,8 +3,7 @@
     "rootNamespace": "HeartfieldEditor.Serialization",
     "references": [
         "GUID:92c74422f5010674baadf032e1479b48",
-        "GUID:e34156bc356b3444991ba3a40e2c0600",
-        "GUID:9ac050bf66a87ed4d8cfd24f91d6c701"
+        "GUID:e34156bc356b3444991ba3a40e2c0600"
     ],
     "includePlatforms": [
         "Editor"

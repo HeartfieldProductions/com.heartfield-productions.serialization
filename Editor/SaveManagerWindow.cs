@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEditor;
 using System.Diagnostics;
 using Heartfield.Serialization;
+using UnityEditor.AnimatedValues;
 using SaveType = Heartfield.Serialization.SaveType;
 
 namespace HeartfieldEditor.Serialization
@@ -74,23 +75,6 @@ namespace HeartfieldEditor.Serialization
             return directory;
         }
 
-        void CreateSettingsAsset()
-        {
-            var resolution = GetAsset.screenshotNativeResolution ? new Vector2Int(Screen.currentResolution.width, Screen.currentResolution.height) :
-                                                                    GetAsset.screenshotResolution;
-
-            var settings = new SettingsSerialization
-            {
-                directory = GetAsset.finalDirectory,
-                takeScreenshot = GetAsset.takeScreenshot,
-                screenshotResolution = resolution,
-                countTotalPlayedTime = GetAsset.countTotalPlayedTime
-            };
-
-            settings.CreateAsset();
-            SaveSettings.LoadAsset();
-        }
-
         void CheckPath()
         {
             bool useGameDataPath = GetAsset.specialFolders == SpecialFolders.GameData;
@@ -131,15 +115,35 @@ namespace HeartfieldEditor.Serialization
         protected override void OnEnable()
         {
             base.OnEnable();
-
             CheckPath();
+
+            GetAsset.takeScreenshot.valueChanged.AddListener(Repaint);
+        }
+
+        protected override void OnDisable()
+        {
+            base.OnDisable();
+            GetAsset.takeScreenshot.valueChanged.RemoveListener(Repaint);
         }
 
         public override void SaveChanges()
         {
             base.SaveChanges();
             CheckPath();
-            CreateSettingsAsset();
+
+            var resolution = GetAsset.screenshotNativeResolution ? new Vector2Int(Screen.currentResolution.width, Screen.currentResolution.height) :
+                                                                    GetAsset.screenshotResolution;
+
+            var settings = new SettingsSerialization
+            {
+                directory = GetAsset.finalDirectory,
+                takeScreenshot = GetAsset.takeScreenshot.value,
+                screenshotResolution = resolution,
+                countTotalPlayedTime = GetAsset.countTotalPlayedTime
+            };
+
+            settings.CreateAsset();
+            SaveSettings.LoadAsset();
         }
 
         bool TargetPlatformIsCurrentPlatform()
@@ -202,9 +206,9 @@ namespace HeartfieldEditor.Serialization
             {
                 EditorGUI.BeginChangeCheck();
                 EditorGUILayout.BeginVertical(EditorStyles.inspectorDefaultMargins);
-                GetAsset.takeScreenshot = EditorGUILayout.BeginToggleGroup("Take Screenshot", GetAsset.takeScreenshot);
+                GetAsset.takeScreenshot.target = EditorGUILayout.BeginToggleGroup("Take Screenshot", GetAsset.takeScreenshot.target);
 
-                if (GetAsset.takeScreenshot)
+                if (EditorGUILayout.BeginFadeGroup(GetAsset.takeScreenshot.faded))
                 {
                     EditorGUILayout.BeginVertical(EditorStyles.inspectorDefaultMargins);
                     EditorGUILayout.BeginVertical("Box");
@@ -229,6 +233,7 @@ namespace HeartfieldEditor.Serialization
                     EditorGUILayout.EndVertical();
                     EditorGUILayout.EndVertical();
                 }
+                EditorGUILayout.EndFadeGroup();
 
                 EditorGUILayout.EndToggleGroup();
                 EditorGUILayout.EndVertical();
